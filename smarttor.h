@@ -1,10 +1,10 @@
-#include <iostream>
+//#include <iostream>
 #include <sai.h>
-#include <cstddef>
-#include <vector>
+//#include <cstddef>
+//#include <vector>
 #include <netinet/in.h>
 
-using namespace std;
+//using namespace std;
 
 enum set_tunnel_tc_action {
 	TC_ADD,
