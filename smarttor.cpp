@@ -1,4 +1,10 @@
-#include "smarttor.h"
+#include <iostream>
+#include <vector>
+extern "C" {
+#include "sai.h"
+}
+
+#define NUM_TEST_BRIDGE 10
 
 /********************************************************************/
 /* Switch                                                           */
@@ -22,28 +28,50 @@ sai_service_method_table_t services = {
 };
 
 std::vector<sai_attribute_t> attrs;
-sai_switch_api_t* sai_switch_api = NULL;
+sai_bridge_api_t* sai_bridge_api = NULL;
 
 int connect_to_switch() {
-	sai_object_id_t switch_id;
 	sai_attribute_t attr;
 	sai_status_t status;
-
+	sai_object_id_t gSwitchId = 0xC;
+	sai_object_id_t bridge_port_id[NUM_TEST_BRIDGE];
+	int i;
 
 	/* Get apis */
-	//sai_api_initialize(0, (const sai_service_method_table_t *)&services);
+	sai_api_initialize(0, (const sai_service_method_table_t *)&services);
 
 	/* etc. */
-	//sai_api_query(SAI_API_SWITCH, (void**)&sai_switch_api);
+	sai_api_query(SAI_API_BRIDGE, (void**)&sai_bridge_api);
 	
-	/* Create switch */
-	attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+	/* Create bridge port */
+	attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+	attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+	attrs.push_back(attr);
+	
+	attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+	attr.value.oid = 0xAB; //port_id;
+	attrs.push_back(attr);
+	
+	attr.id = SAI_BRIDGE_PORT_ATTR_ADMIN_STATE;
 	attr.value.booldata = true;
 	attrs.push_back(attr);
 
-	status = sai_switch_api->create_switch(&switch_id, //&info.switch_id,
-					       (uint32_t)attrs.size(),
-					       attrs.data());
+	for (i = 0; i < NUM_TEST_BRIDGE; i++) {	
+		status = sai_bridge_api->create_bridge_port(&bridge_port_id[i],
+		                                            gSwitchId,
+		                                            (uint32_t)attrs.size(),
+		                                            attrs.data());
+	
+		printf("bridge_port_id =%d\n", bridge_port_id[i]);
+	}
+	sai_api_uninitialize();
+	return 0;
+}
+
+int main (void) {
+	printf("sai2tc hello\n");
+
+	connect_to_switch();
 }
 
 ///********************************************************************/

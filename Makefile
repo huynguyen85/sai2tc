@@ -1,12 +1,12 @@
 CFLAGS ?= -g -ftree-vectorize -Wformat=0
 CFLAGS += -pedantic -std=gnu99 -Wall -Wextra -I SAI/inc
 #LIBS=-lm -lrt -libverbs -lhugetlbfs -lrdmacm -lpthread -lcap
-LIBS=-lm -lrt
+LIBS=-lm -lrt -lsai
 PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
 MAN1DIR=$(PREFIX)/share/man/man1
 
-SRCS=smarttor.cpp main.cpp
+SRCS=smarttor.cpp
 OBJS=$(SRCS:.c=.o)
 BINARY=sai2tc
 

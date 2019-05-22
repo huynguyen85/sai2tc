@@ -1,4 +1,24 @@
-#include "smarttor.h"
+#include "mlnx_sai.h"
+
+sai_db_t    *g_sai_db_ptr  = NULL;
+static bool  g_initialized = false;
+
+const sai_bridge_api_t mlnx_bridge_api = {
+	NULL,//mlnx_create_bridge,
+	NULL,//mlnx_remove_bridge,
+	NULL,//mlnx_set_bridge_attribute,
+	NULL,//mlnx_get_bridge_attribute,
+	NULL,//mlnx_get_bridge_stats,
+	NULL,//mlnx_get_bridge_stats_ext,
+	NULL,//mlnx_clear_bridge_stats,
+	mlnx_create_bridge_port,
+	mlnx_remove_bridge_port,
+	NULL,//mlnx_set_bridge_port_attribute,
+	NULL,//mlnx_get_bridge_port_attribute,
+	NULL,//mlnx_get_bridge_port_stats,
+	NULL,//mlnx_get_bridge_port_stats_ext,
+	NULL,//mlnx_clear_bridge_port_stats
+};
 
 /*
  * Routine Description:
@@ -16,9 +36,25 @@
  */
 sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_table)
 {
-	return SAI_STATUS_UNINITIALIZED;
-}
+	if (!g_initialized) {
+		MLNX_SAI_LOG("SAI API not initialized before calling API query\n");
+		return SAI_STATUS_UNINITIALIZED;
+	}
 
+	if (NULL == api_method_table) {
+		MLNX_SAI_LOG("NULL method table passed to SAI API initialize\n");
+		return SAI_STATUS_INVALID_PARAMETER;
+	}
+
+	switch (sai_api_id) {
+	case SAI_API_BRIDGE:
+		*(const sai_bridge_api_t**)api_method_table = &mlnx_bridge_api;
+		return SAI_STATUS_SUCCESS;
+	default:
+		MLNX_SAI_LOG("Invalid API type %d\n", sai_api_id);
+	        return SAI_STATUS_INVALID_PARAMETER;	
+	}
+}
 /*
  * Routine Description:
  *     Query sai object type.
@@ -38,17 +74,19 @@ sai_object_type_t sai_object_type_query(_In_ sai_object_id_t sai_object_id)
 /*
  * Routine Description:
  *     Adapter module initialization call. This is NOT for SDK initialization.
- *
- * Arguments:
+  * Arguments:
  *     [in] flags - reserved for future use, must be zero
- *     [in] services - methods table with services provided by adapter host
- *
+ *     [in] services - methods table with services provided by adapter host*
  * Return Values:
  *    SAI_STATUS_SUCCESS on success
  *    Failure status code on error
  */
 sai_status_t sai_api_initialize(_In_ uint64_t flags, _In_ const sai_service_method_table_t* services)
 {
+	MLNX_SAI_LOG("sai_api_initialize\n");
+
+	g_initialized = true;
+	g_sai_db_ptr = (sai_db_t *) calloc(1, sizeof(*g_sai_db_ptr));
 	return SAI_STATUS_SUCCESS; 
 }
 
@@ -66,6 +104,10 @@ sai_status_t sai_api_initialize(_In_ uint64_t flags, _In_ const sai_service_meth
  */
 sai_status_t sai_api_uninitialize(void)
 {
+	MLNX_SAI_LOG("sai_api_uninitialize\n");
+
+	g_initialized = false;
+	free (g_sai_db_ptr);
 	return SAI_STATUS_SUCCESS;
 }
 
