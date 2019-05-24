@@ -4,8 +4,11 @@ extern "C" {
 #include "sai.h"
 }
 
-#define NUM_TEST_BRIDGE 10
+#define SAI_ERR(status) ((status) != SAI_STATUS_SUCCESS)
 
+#define NUM_TEST_BRIDGE 10
+#define NUM_TEST_VLAN 7
+#define NUM_TEST_VLAN_MEMBER (NUM_TEST_BRIDGE * NUM_TEST_VLAN / 10)
 /********************************************************************/
 /* Switch                                                           */
 /********************************************************************/
@@ -29,12 +32,15 @@ sai_service_method_table_t services = {
 
 std::vector<sai_attribute_t> attrs;
 sai_bridge_api_t* sai_bridge_api = NULL;
+sai_vlan_api_t* sai_vlan_api = NULL;
 
 int connect_to_switch() {
 	sai_attribute_t attr;
 	sai_status_t status;
 	sai_object_id_t gSwitchId = 0xC;
-	sai_object_id_t bridge_port_id[NUM_TEST_BRIDGE];
+	sai_object_id_t sai_bridge_port_id[NUM_TEST_BRIDGE];
+	sai_object_id_t sai_vlan_id[NUM_TEST_VLAN];
+	sai_object_id_t sai_vlan_member_id[NUM_TEST_VLAN_MEMBER];
 	int i;
 
 	/* Get apis */
@@ -44,6 +50,7 @@ int connect_to_switch() {
 	sai_api_query(SAI_API_BRIDGE, (void**)&sai_bridge_api);
 	
 	/* Create bridge port */
+	attrs.clear();
 	attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
 	attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
 	attrs.push_back(attr);
@@ -57,13 +64,69 @@ int connect_to_switch() {
 	attrs.push_back(attr);
 
 	for (i = 0; i < NUM_TEST_BRIDGE; i++) {	
-		status = sai_bridge_api->create_bridge_port(&bridge_port_id[i],
+		status = sai_bridge_api->create_bridge_port(&sai_bridge_port_id[i],
 		                                            gSwitchId,
 		                                            (uint32_t)attrs.size(),
 		                                            attrs.data());
 	
-		printf("bridge_port_id =%d\n", bridge_port_id[i]);
+		printf("sai_bridge_port_id =%d\n", sai_bridge_port_id[i]);
 	}
+
+	/* Create vlan and vlan member */
+	sai_api_query(SAI_API_VLAN, (void**)&sai_vlan_api);
+
+	for (i = 0; i < NUM_TEST_VLAN; i++) {
+		attrs.clear();
+		attr.id = SAI_VLAN_ATTR_VLAN_ID;
+		attr.value.u16 = i + 0xA0; //vlan_id;
+		attrs.push_back(attr);
+
+		status = sai_vlan_api->create_vlan(&sai_vlan_id[i],
+		                                   gSwitchId,
+		                                   (uint32_t)attrs.size(),
+		                                   attrs.data());
+	
+		printf("sai_vlan_id =%d\n", sai_vlan_id[i]);
+	}
+
+	for (i = 0; i < NUM_TEST_VLAN_MEMBER; i++) {
+		attrs.clear();
+		attr.id = SAI_VLAN_MEMBER_ATTR_VLAN_ID;
+		attr.value.oid = i + 0xA0; //sai_vlan_id;
+		attrs.push_back(attr);
+
+		attr.id = SAI_VLAN_MEMBER_ATTR_BRIDGE_PORT_ID;
+		attr.value.oid = 0xAB; //sai_bridge_port_id;
+		attrs.push_back(attr);
+
+		status = sai_vlan_api->create_vlan_member(&sai_vlan_member_id[i],
+							  gSwitchId,
+		                                   	  (uint32_t)attrs.size(),
+		                                   	  attrs.data());
+	
+		printf("sai_vlan_member_id =%d\n", sai_vlan_member_id[i]);
+	}
+
+	/* Clean up */
+	printf("Clean up\n");
+	for (i = 0; i < NUM_TEST_BRIDGE; i++) {
+		status = sai_bridge_api->remove_bridge_port(sai_bridge_port_id[i]);
+		if (SAI_ERR(status))
+			printf("clean bridge %d, sai_bridge_port_id=%d, status=%x\n", i, sai_bridge_port_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_VLAN; i++) {
+		status = sai_vlan_api->remove_vlan(sai_vlan_id[i]);
+		if (SAI_ERR(status))
+			printf("clean vlan %d, sai_vlan_id=%d, status=%x\n", i, sai_vlan_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_VLAN_MEMBER; i++) {
+		status = sai_vlan_api->remove_vlan_member(sai_vlan_member_id[i]);
+		if (SAI_ERR(status))
+			printf("clean vlan_member %d, sai_vlan_member_id=%d, status=%x\n", i, sai_vlan_member_id[i], status);
+	}
+
 	sai_api_uninitialize();
 	return 0;
 }

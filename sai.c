@@ -20,6 +20,22 @@ const sai_bridge_api_t mlnx_bridge_api = {
 	NULL,//mlnx_clear_bridge_port_stats
 };
 
+const sai_vlan_api_t mlnx_vlan_api = {
+	mlnx_create_vlan,
+	mlnx_remove_vlan,
+	NULL,//mlnx_set_vlan_attribute,
+	NULL,//mlnx_get_vlan_attribute,
+	mlnx_create_vlan_member,
+	mlnx_remove_vlan_member,
+	NULL,//mlnx_set_vlan_member_attribute,
+	NULL,//mlnx_get_vlan_member_attribute,
+	NULL,//mlnx_create_vlan_members,
+	NULL,//mlnx_remove_vlan_members,
+	NULL,//mlnx_get_vlan_stats,
+	NULL,//mlnx_get_vlan_stats_ext,
+	NULL,//mlnx_clear_vlan_stats
+};
+
 /*
  * Routine Description:
  *     Retrieve a pointer to the C-style method table for desired SAI
@@ -50,6 +66,10 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
 	case SAI_API_BRIDGE:
 		*(const sai_bridge_api_t**)api_method_table = &mlnx_bridge_api;
 		return SAI_STATUS_SUCCESS;
+	case SAI_API_VLAN:
+		*(const sai_vlan_api_t**)api_method_table = &mlnx_vlan_api;
+		return SAI_STATUS_SUCCESS;
+
 	default:
 		MLNX_SAI_LOG("Invalid API type %d\n", sai_api_id);
 	        return SAI_STATUS_INVALID_PARAMETER;	
