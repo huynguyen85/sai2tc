@@ -9,6 +9,8 @@ extern "C" {
 #define NUM_TEST_BRIDGE 10
 #define NUM_TEST_VLAN 7
 #define NUM_TEST_VLAN_MEMBER (NUM_TEST_BRIDGE * NUM_TEST_VLAN / 10)
+#define NUM_TEST_VR NUM_TEST_VLAN
+#define NUM_TEST_ROUTER_INTERFACE NUM_TEST_VLAN
 /********************************************************************/
 /* Switch                                                           */
 /********************************************************************/
@@ -31,8 +33,10 @@ sai_service_method_table_t services = {
 };
 
 std::vector<sai_attribute_t> attrs;
-sai_bridge_api_t* sai_bridge_api = NULL;
-sai_vlan_api_t* sai_vlan_api = NULL;
+sai_bridge_api_t             *sai_bridge_api = NULL;
+sai_vlan_api_t               *sai_vlan_api = NULL;
+sai_virtual_router_api_t     *sai_vr_api = NULL;
+sai_router_interface_api_t   *sai_router_interface_api = NULL;
 
 int connect_to_switch() {
 	sai_attribute_t attr;
@@ -41,6 +45,8 @@ int connect_to_switch() {
 	sai_object_id_t sai_bridge_port_id[NUM_TEST_BRIDGE];
 	sai_object_id_t sai_vlan_id[NUM_TEST_VLAN];
 	sai_object_id_t sai_vlan_member_id[NUM_TEST_VLAN_MEMBER];
+	sai_object_id_t sai_vr_id[NUM_TEST_VR];
+	sai_object_id_t sai_ri_id[NUM_TEST_ROUTER_INTERFACE];
 	int i;
 
 	/* Get apis */
@@ -107,6 +113,40 @@ int connect_to_switch() {
 		printf("sai_vlan_member_id =%d\n", sai_vlan_member_id[i]);
 	}
 
+	/* create virtual router and router interface */
+	sai_api_query(SAI_API_VIRTUAL_ROUTER, (void**)&sai_vr_api);	
+
+	for (i = 0; i < NUM_TEST_VR; i++) {
+		attrs.clear();
+
+		status = sai_vr_api->create_virtual_router(&sai_vr_id[i],
+                                   			     gSwitchId,
+		                                             (uint32_t)attrs.size(),
+		                                             attrs.data());
+	
+		printf("sai_vr_id =%d\n", sai_vr_id[i]);
+	}
+
+
+	sai_api_query(SAI_API_ROUTER_INTERFACE, (void**)&sai_router_interface_api);
+	for (i = 0; i < NUM_TEST_ROUTER_INTERFACE; i++) {
+		attrs.clear();
+		attr.id = SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID;
+		attr.value.oid = i + 0x70;
+		attrs.push_back(attr);
+		attr.id = SAI_ROUTER_INTERFACE_ATTR_VLAN_ID;
+		attr.value.oid = 0x80;
+		attrs.push_back(attr);
+		
+		status = sai_router_interface_api->create_router_interface(
+							&sai_ri_id[i],
+							gSwitchId,
+		                              		(uint32_t)attrs.size(),
+		                                  	attrs.data());
+	
+		printf("sai_ri_id =%d\n", sai_ri_id[i]);
+	}
+
 	/* Clean up */
 	printf("Clean up\n");
 	for (i = 0; i < NUM_TEST_BRIDGE; i++) {
@@ -125,6 +165,18 @@ int connect_to_switch() {
 		status = sai_vlan_api->remove_vlan_member(sai_vlan_member_id[i]);
 		if (SAI_ERR(status))
 			printf("clean vlan_member %d, sai_vlan_member_id=%d, status=%x\n", i, sai_vlan_member_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_VR; i++) {
+		status = sai_vr_api->remove_virtual_router(sai_vr_id[i]);
+		if (SAI_ERR(status))
+			printf("clean virtual router %d, sai_vr_id=%d, status=%x\n", i, sai_vr_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_ROUTER_INTERFACE; i++) {
+		status = sai_router_interface_api->remove_router_interface(sai_ri_id[i]);
+		if (SAI_ERR(status))
+			printf("clean router interface %d, sai_ri_id=%d, status=%x\n", i, sai_ri_id[i], status);
 	}
 
 	sai_api_uninitialize();

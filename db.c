@@ -2,6 +2,191 @@
 
 extern sai_db_t  *g_sai_db_ptr;
 
+static sai_status_t mlnx_router_interface_add(
+		sai_object_id_t        *sai_router_interface_id,
+		sai_object_id_t         sai_vr_id,
+		sai_object_id_t         sai_vlan_id)
+{
+	mlnx_router_interface_t     *new_ri;
+	uint32_t                     ii;
+
+	for (ii = 0; ii < MAX_ROUTER_INTERFACE_DB; ii++) {
+		if (!g_sai_db_ptr->router_interface_db[ii]) {
+			g_sai_db_ptr->router_interface_db[ii] =
+				(mlnx_router_interface_t *) calloc (1, sizeof(*new_ri));
+			if (!g_sai_db_ptr->router_interface_db[ii])
+				return SAI_STATUS_NO_MEMORY;
+			new_ri = g_sai_db_ptr->router_interface_db[ii];
+
+			new_ri->sai_vr_id        = sai_vr_id;
+			new_ri->sai_vlan_id      = sai_vlan_id;
+			new_ri->index            = ii;
+			*sai_router_interface_id = ii;
+			return SAI_STATUS_SUCCESS;
+		}
+        }
+
+	return SAI_STATUS_TABLE_FULL;
+}
+
+static sai_status_t mlnx_router_interface_del(sai_object_id_t sai_router_interface_id)
+{
+	if (sai_router_interface_id >= MAX_ROUTER_INTERFACE_DB)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	free(g_sai_db_ptr->router_interface_db[sai_router_interface_id]);
+	g_sai_db_ptr->router_interface_db[sai_router_interface_id] = NULL;
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/**
+ * @brief Create router interface.
+ *
+ * @param[out] router_interface_id Router interface id
+ * @param[in] switch_id Switch id
+ * @param[in] attr_count Number of attributes
+ * @param[in] attr_list Array of attributes
+ *
+ * @return #SAI_STATUS_SUCCESS on success, failure status code on error
+ */
+sai_status_t mlnx_create_router_interface (
+	_Out_ sai_object_id_t *sai_router_interface_id,
+	_In_ sai_object_id_t switch_id,
+	_In_ uint32_t attr_count,
+	_In_ const sai_attribute_t *attr_list)
+{
+	sai_status_t                 status = SAI_STATUS_NOT_IMPLEMENTED;
+	const sai_attribute_value_t *attr_val;
+	uint32_t                     attr_idx;
+	sai_object_id_t              sai_vlan_id;
+	sai_object_id_t              sai_vr_id;
+
+	MLNX_SAI_DBG("mlnx_create_router_interface\n");
+    
+	if (NULL == sai_router_interface_id) {
+		return SAI_STATUS_INVALID_PARAMETER;
+	}
+
+	status = find_attrib_in_list(attr_count, attr_list, SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory  SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID=%lx\n", attr_val->oid);
+	sai_vr_id = attr_val->oid;
+
+	status = find_attrib_in_list(attr_count, attr_list, SAI_ROUTER_INTERFACE_ATTR_VLAN_ID, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory  SAI_ROUTER_INTERFACE_ATTR_VLAN_ID attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_ROUTER_INTERFACE_ATTR_VLAN_ID=%lx\n", attr_val->oid);
+	sai_vlan_id = attr_val->oid;
+
+	status = mlnx_router_interface_add(sai_router_interface_id, sai_vr_id, sai_vlan_id);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Failed to allocate router interface entry\n");
+	}
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/**
+ * @brief Remove router interface
+ *
+ * @param[in] router_interface_id Router interface id
+ *
+ * @return #SAI_STATUS_SUCCESS on success, failure status code on error
+ */
+sai_status_t mlnx_remove_router_interface (_In_ sai_object_id_t sai_router_interface_id)
+{
+	return mlnx_router_interface_del(sai_router_interface_id);
+}
+
+static sai_status_t mlnx_virtual_router_add(sai_object_id_t *sai_vr_id)
+{
+	mlnx_virtual_router_t     *new_vr;
+	uint32_t            ii;
+
+	for (ii = 0; ii < MAX_VRS_DB; ii++) {
+		if (!g_sai_db_ptr->vrs_db[ii]) {
+			g_sai_db_ptr->vrs_db[ii] =
+				(mlnx_virtual_router_t *) calloc (1, sizeof(*new_vr));
+			if (!g_sai_db_ptr->vrs_db[ii])
+				return SAI_STATUS_NO_MEMORY;
+			new_vr = g_sai_db_ptr->vlan_members_db[ii];
+
+			new_vr->index    = ii;
+			*sai_vr_id       = ii;
+			return SAI_STATUS_SUCCESS;
+		}
+        }
+
+	return SAI_STATUS_TABLE_FULL;
+}
+
+static sai_status_t mlnx_virtual_router_del(sai_object_id_t sai_vr_id)
+{
+	if (sai_vr_id >= MAX_VRS_DB)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	free(g_sai_db_ptr->vrs_db[sai_vr_id]);
+	g_sai_db_ptr->vrs_db[sai_vr_id] = NULL;
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/*
+ * Routine Description:
+ *    Create virtual router
+ *
+ * Arguments:
+ *    [out] vr_id - virtual router id
+ *    [in] attr_count - number of attributes
+ *    [in] attr_list - array of attributes
+ *
+ * Return Values:
+ *    SAI_STATUS_SUCCESS on success
+ *    Failure status code on error
+ */
+sai_status_t mlnx_create_virtual_router(_Out_ sai_object_id_t      *sai_vr_id,
+					_In_ sai_object_id_t        switch_id,
+					_In_ uint32_t               attr_count,
+					_In_ const sai_attribute_t *attr_list)
+{
+	sai_status_t                 status = SAI_STATUS_NOT_IMPLEMENTED;
+
+	MLNX_SAI_DBG("mlnx_create_virtual_router\n");
+    
+	if (NULL == sai_vr_id) {
+		return SAI_STATUS_INVALID_PARAMETER;
+	}
+
+	status = mlnx_virtual_router_add(sai_vr_id);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Failed to allocate virtual router entry\n");
+	}
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/*
+ * Routine Description:
+ *    Remove virtual router
+ *
+ * Arguments:
+ *    [in] vr_id - virtual router id
+ *
+ * Return Values:
+ *    SAI_STATUS_SUCCESS on success
+ *    Failure status code on error
+ */
+sai_status_t mlnx_remove_virtual_router(_In_ sai_object_id_t sai_vr_id)
+{
+	return mlnx_virtual_router_del(sai_vr_id);
+}
+
 static sai_status_t mlnx_vlan_member_add(sai_object_id_t        *sai_vlan_member_id,
 					 sai_object_id_t         sai_vlan_id,
 					 sai_object_id_t         sai_bridge_port_id)
@@ -82,10 +267,10 @@ sai_status_t mlnx_create_vlan_member(_Out_ sai_object_id_t      *vlan_member_id,
 
 	status = mlnx_vlan_member_add(vlan_member_id, sai_vlan_id, sai_bridge_port_id);
 	if (SAI_ERR(status)) {
-		MLNX_SAI_LOG("Failed to allocate vlan member entry\n");
+		MLNX_SAI_ERR("Failed to allocate vlan member entry\n");
 	}
 
-	return SAI_STATUS_INVALID_PARAMETER;
+	return SAI_STATUS_SUCCESS;
 }
 
 /*
@@ -117,7 +302,6 @@ static sai_status_t mlnx_vlan_add(sai_object_id_t        *sai_vlan_id,
 			new_vlan->vlan_id    = vlan_id;
 			new_vlan->index      = ii;
 			*sai_vlan_id         = ii;
-			new_vlan->is_present = true;
 			return SAI_STATUS_SUCCESS;
 		}
         }
@@ -173,7 +357,7 @@ sai_status_t mlnx_create_vlan(_Out_ sai_object_id_t      *sai_vlan_id,
 		MLNX_SAI_LOG("Failed to allocate vlan entry\n");
 	}
 
-	return SAI_STATUS_INVALID_PARAMETER;
+	return SAI_STATUS_SUCCESS;
 }
 
 /*
@@ -210,7 +394,6 @@ static sai_status_t mlnx_bridge_port_add(sai_object_id_t        *sai_bridge_port
 			new_port->port_id    = port_id;
 			new_port->index      = ii;
 			*sai_bridge_port_id  = ii;
-			new_port->is_present = true;
 			return SAI_STATUS_SUCCESS;
 		}
         }
@@ -268,7 +451,7 @@ sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port
 		MLNX_SAI_LOG("Failed to allocate bridge port entry\n");
 	}
 
-	return SAI_STATUS_INVALID_PARAMETER;
+	return SAI_STATUS_SUCCESS;
 }
 
 /**

@@ -36,6 +36,20 @@ const sai_vlan_api_t mlnx_vlan_api = {
 	NULL,//mlnx_clear_vlan_stats
 };
 
+const sai_virtual_router_api_t mlnx_virtual_router_api = {
+	mlnx_create_virtual_router,
+	mlnx_remove_virtual_router,
+	NULL,//mlnx_set_virtual_router_attribute,
+	NULL,//mlnx_get_virtual_router_attribute
+};
+
+const sai_router_interface_api_t mlnx_router_interface_api = {
+	mlnx_create_router_interface,
+	mlnx_remove_router_interface,
+	NULL, //stub_set_router_interface_attribute,
+	NULL, //stub_get_router_interface_attribute,
+};
+
 /*
  * Routine Description:
  *     Retrieve a pointer to the C-style method table for desired SAI
@@ -66,8 +80,17 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
 	case SAI_API_BRIDGE:
 		*(const sai_bridge_api_t**)api_method_table = &mlnx_bridge_api;
 		return SAI_STATUS_SUCCESS;
+
 	case SAI_API_VLAN:
 		*(const sai_vlan_api_t**)api_method_table = &mlnx_vlan_api;
+		return SAI_STATUS_SUCCESS;
+
+	case SAI_API_VIRTUAL_ROUTER:
+		*(const sai_virtual_router_api_t**)api_method_table = &mlnx_virtual_router_api;
+		return SAI_STATUS_SUCCESS;
+
+	case SAI_API_ROUTER_INTERFACE:
+		*(const sai_router_interface_api_t**)api_method_table = &mlnx_router_interface_api;
 		return SAI_STATUS_SUCCESS;
 
 	default:
