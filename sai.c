@@ -50,6 +50,28 @@ const sai_router_interface_api_t mlnx_router_interface_api = {
 	NULL, //stub_get_router_interface_attribute,
 };
 
+const sai_tunnel_api_t mlnx_tunnel_api = {
+	mlnx_create_tunnel_map,
+	mlnx_remove_tunnel_map,
+	NULL,//mlnx_set_tunnel_map_attribute,
+	NULL,//mlnx_get_tunnel_map_attribute,
+	NULL,//mlnx_create_tunnel,
+	NULL,//mlnx_remove_tunnel,
+	NULL,//mlnx_set_tunnel_attribute,
+	NULL,//mlnx_get_tunnel_attribute,
+	NULL,//mlnx_get_tunnel_stats,
+	NULL,//mlnx_get_tunnel_stats_ext,
+	NULL,//mlnx_clear_tunnel_stats,
+	NULL,//mlnx_create_tunnel_term_table_entry,
+	NULL,//mlnx_remove_tunnel_term_table_entry,
+	NULL,//mlnx_set_tunnel_term_table_entry_attribute,
+	NULL,//mlnx_get_tunnel_term_table_entry_attribute,
+	NULL,//mlnx_create_tunnel_map_entry,
+	NULL,//mlnx_remove_tunnel_map_entry,
+	NULL,//mlnx_set_tunnel_map_entry_attribute,
+	NULL,//mlnx_get_tunnel_map_entry_attribute,
+};
+
 /*
  * Routine Description:
  *     Retrieve a pointer to the C-style method table for desired SAI
@@ -91,6 +113,10 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
 
 	case SAI_API_ROUTER_INTERFACE:
 		*(const sai_router_interface_api_t**)api_method_table = &mlnx_router_interface_api;
+		return SAI_STATUS_SUCCESS;
+
+	case SAI_API_TUNNEL:
+		*(const sai_tunnel_api_t**)api_method_table = &mlnx_tunnel_api;
 		return SAI_STATUS_SUCCESS;
 
 	default:

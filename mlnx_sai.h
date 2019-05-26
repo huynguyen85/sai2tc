@@ -7,7 +7,8 @@
 #define MAX_BRIDGE_PORTS             128
 #define MAX_VLAN_MEMBERS_DB          (MAX_VLANS_DB * MAX_BRIDGE_PORTS / 1000)
 #define MAX_VRS_DB                   MAX_VLANS_DB
-#define MAX_ROUTER_INTERFACE_DB       MAX_VLANS_DB
+#define MAX_ROUTER_INTERFACE_DB      MAX_VLANS_DB
+#define MAX_TUNNEL_MAP_DB            (MAX_VLANS_DB * 10)
 
 #define MLNX_SAI_LOG(fmt, ...) printf(fmt, ## __VA_ARGS__)
 #define MLNX_SAI_DBG(fmt, ...) printf(fmt, ## __VA_ARGS__)
@@ -61,6 +62,10 @@ typedef struct mlnx_router_interface {
 	sai_object_id_t        sai_vlan_id;
 } mlnx_router_interface_t;
 
+typedef struct _mlnx_tunnel_map_t {
+	uint32_t               index; /* also sai tunnel map id */
+} mlnx_tunnel_map_t;
+
 typedef struct sai_db {
 	mlnx_port_t                   *ports_db[MAX_PORTS_DB];
 	mlnx_bridge_port_t            *bridge_ports_db[MAX_BRIDGE_PORTS];
@@ -68,6 +73,7 @@ typedef struct sai_db {
 	mlnx_vlan_member_t            *vlan_members_db[MAX_VLAN_MEMBERS_DB];
 	mlnx_virtual_router_t         *vrs_db[MAX_VRS_DB];
 	mlnx_router_interface_t       *router_interface_db[MAX_ROUTER_INTERFACE_DB];
+	mlnx_tunnel_map_t             *tunnel_map_db[MAX_TUNNEL_MAP_DB];
 } sai_db_t;
 
 sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port_id,
@@ -107,3 +113,9 @@ sai_status_t mlnx_create_router_interface (
 	_In_ uint32_t attr_count,
 	_In_ const sai_attribute_t *attr_list);
 sai_status_t mlnx_remove_router_interface (_In_ sai_object_id_t sai_router_interface_id);
+sai_status_t mlnx_create_tunnel_map(
+	_Out_ sai_object_id_t *sai_tunnel_map_id,
+	_In_ sai_object_id_t switch_id,
+	_In_ uint32_t attr_count,
+	_In_ const sai_attribute_t *attr_list);
+sai_status_t mlnx_remove_tunnel_map(_In_ sai_object_id_t sai_tunnel_map_id);

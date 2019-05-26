@@ -2,6 +2,84 @@
 
 extern sai_db_t  *g_sai_db_ptr;
 
+static sai_status_t mlnx_tunnel_map_add(sai_object_id_t *sai_tun_map_id)
+{
+	mlnx_tunnel_map_t     *new_tm;
+	uint32_t            ii;
+
+	for (ii = 0; ii < MAX_TUNNEL_MAP_DB; ii++) {
+		if (!g_sai_db_ptr->tunnel_map_db[ii]) {
+			g_sai_db_ptr->tunnel_map_db[ii] =
+				(mlnx_tunnel_map_t *) calloc (1, sizeof(*new_tm));
+			if (!g_sai_db_ptr->tunnel_map_db[ii])
+				return SAI_STATUS_NO_MEMORY;
+			new_tm = g_sai_db_ptr->tunnel_map_db[ii];
+
+			new_tm->index    = ii;
+			*sai_tun_map_id  = ii;
+			return SAI_STATUS_SUCCESS;
+		}
+        }
+
+	return SAI_STATUS_TABLE_FULL;
+}
+
+static sai_status_t mlnx_tunnel_map_del(sai_object_id_t sai_tun_map_id)
+{
+	if (sai_tun_map_id >= MAX_TUNNEL_MAP_DB)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	free(g_sai_db_ptr->tunnel_map_db[sai_tun_map_id]);
+	g_sai_db_ptr->tunnel_map_db[sai_tun_map_id] = NULL;
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/**
+ * @brief Create tunnel Map
+ *
+ * @param[out] tunnel_map_id Tunnel Map Id
+ * @param[in] switch_id Switch Id
+ * @param[in] attr_count Number of attributes
+ * @param[in] attr_list Array of attributes
+ *
+ * @return #SAI_STATUS_SUCCESS on success, failure status code on error
+ */
+sai_status_t mlnx_create_tunnel_map(
+	_Out_ sai_object_id_t *sai_tunnel_map_id,
+	_In_ sai_object_id_t switch_id,
+	_In_ uint32_t attr_count,
+	_In_ const sai_attribute_t *attr_list)
+{
+	sai_status_t  status = SAI_STATUS_NOT_IMPLEMENTED;
+
+	MLNX_SAI_DBG("mlnx_create_tunnel_map\n");
+    
+	if (NULL == sai_tunnel_map_id) {
+		return SAI_STATUS_INVALID_PARAMETER;
+	}
+
+	status = mlnx_tunnel_map_add(sai_tunnel_map_id);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Failed to allocate tunnel map entry\n");
+	}
+
+	return SAI_STATUS_SUCCESS;
+}
+
+/**
+ * @brief Remove tunnel Map
+ *
+ * @param[in] tunnel_map_id Tunnel Map id to be removed
+ *
+ * @return #SAI_STATUS_SUCCESS on success, failure status code on error
+ */
+sai_status_t mlnx_remove_tunnel_map(_In_ sai_object_id_t sai_tunnel_map_id)
+{
+	return mlnx_tunnel_map_del(sai_tunnel_map_id);
+}
+
+
 static sai_status_t mlnx_router_interface_add(
 		sai_object_id_t        *sai_router_interface_id,
 		sai_object_id_t         sai_vr_id,
@@ -155,7 +233,7 @@ sai_status_t mlnx_create_virtual_router(_Out_ sai_object_id_t      *sai_vr_id,
 					_In_ uint32_t               attr_count,
 					_In_ const sai_attribute_t *attr_list)
 {
-	sai_status_t                 status = SAI_STATUS_NOT_IMPLEMENTED;
+	sai_status_t  status = SAI_STATUS_NOT_IMPLEMENTED;
 
 	MLNX_SAI_DBG("mlnx_create_virtual_router\n");
     

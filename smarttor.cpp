@@ -6,11 +6,12 @@ extern "C" {
 
 #define SAI_ERR(status) ((status) != SAI_STATUS_SUCCESS)
 
-#define NUM_TEST_BRIDGE 10
-#define NUM_TEST_VLAN 7
-#define NUM_TEST_VLAN_MEMBER (NUM_TEST_BRIDGE * NUM_TEST_VLAN / 10)
-#define NUM_TEST_VR NUM_TEST_VLAN
-#define NUM_TEST_ROUTER_INTERFACE NUM_TEST_VLAN
+#define NUM_TEST_BRIDGE                           10
+#define NUM_TEST_VLAN                             7
+#define NUM_TEST_VLAN_MEMBER                      (NUM_TEST_BRIDGE * NUM_TEST_VLAN / 10)
+#define NUM_TEST_VR                               NUM_TEST_VLAN
+#define NUM_TEST_ROUTER_INTERFACE                 NUM_TEST_VLAN
+#define NUM_TEST_TUNNEL_MAP                       NUM_TEST_VLAN
 /********************************************************************/
 /* Switch                                                           */
 /********************************************************************/
@@ -37,6 +38,7 @@ sai_bridge_api_t             *sai_bridge_api = NULL;
 sai_vlan_api_t               *sai_vlan_api = NULL;
 sai_virtual_router_api_t     *sai_vr_api = NULL;
 sai_router_interface_api_t   *sai_router_interface_api = NULL;
+sai_tunnel_api_t             *sai_tunnel_api = NULL;
 
 int connect_to_switch() {
 	sai_attribute_t attr;
@@ -47,6 +49,7 @@ int connect_to_switch() {
 	sai_object_id_t sai_vlan_member_id[NUM_TEST_VLAN_MEMBER];
 	sai_object_id_t sai_vr_id[NUM_TEST_VR];
 	sai_object_id_t sai_ri_id[NUM_TEST_ROUTER_INTERFACE];
+	sai_object_id_t sai_tunnel_map_id[NUM_TEST_TUNNEL_MAP];
 	int i;
 
 	/* Get apis */
@@ -147,6 +150,20 @@ int connect_to_switch() {
 		printf("sai_ri_id =%d\n", sai_ri_id[i]);
 	}
 
+	/* create tunnel */
+	sai_api_query(SAI_API_TUNNEL, (void**)&sai_tunnel_api);
+
+	for (i = 0; i < NUM_TEST_TUNNEL_MAP; i++) {
+		attrs.clear();
+
+		status = sai_tunnel_api->create_tunnel_map(&sai_tunnel_map_id[i],
+                                     			   gSwitchId,
+		                                           (uint32_t)attrs.size(),
+		                                           attrs.data());
+	
+		printf("sai_tunnel_map_id =%d\n", sai_tunnel_map_id[i]);
+	}
+
 	/* Clean up */
 	printf("Clean up\n");
 	for (i = 0; i < NUM_TEST_BRIDGE; i++) {
@@ -177,6 +194,12 @@ int connect_to_switch() {
 		status = sai_router_interface_api->remove_router_interface(sai_ri_id[i]);
 		if (SAI_ERR(status))
 			printf("clean router interface %d, sai_ri_id=%d, status=%x\n", i, sai_ri_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_TUNNEL_MAP; i++) {
+		status = sai_tunnel_api->remove_tunnel_map(sai_tunnel_map_id[i]);
+		if (SAI_ERR(status))
+			printf("clean tunnel map %d, sai_tunnel_map_id=%d, status=%x\n", i, sai_tunnel_map_id[i], status);
 	}
 
 	sai_api_uninitialize();
