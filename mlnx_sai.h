@@ -9,6 +9,9 @@
 #define MAX_VRS_DB                   MAX_VLANS_DB
 #define MAX_ROUTER_INTERFACE_DB      MAX_VLANS_DB
 #define MAX_TUNNEL_MAP_DB            (MAX_VLANS_DB * 10)
+#define MAX_TM_ENTRY_DB              (MAX_VLANS_DB * 10)
+#define MAX_TUNNEL_DB                (MAX_VLANS_DB * 10)
+
 
 #define MLNX_SAI_LOG(fmt, ...) printf(fmt, ## __VA_ARGS__)
 #define MLNX_SAI_DBG(fmt, ...) printf(fmt, ## __VA_ARGS__)
@@ -64,7 +67,22 @@ typedef struct mlnx_router_interface {
 
 typedef struct _mlnx_tunnel_map_t {
 	uint32_t               index; /* also sai tunnel map id */
+	int32_t                type; /* VRF_ID_TO_VNI: encap. VNI_ID_TO_VRF: decap */
 } mlnx_tunnel_map_t;
+
+typedef struct mlnx_tm_entry_t {
+	uint32_t               index; /* also sai tm entry id */
+	sai_object_id_t        sai_vr_id;
+	sai_object_id_t        sai_tm_id; /* sai tunnel map id */
+	uint32_t               vni;
+} mlnx_tm_entry_t;
+
+typedef struct mlnx_tunnel_t {
+	uint32_t               index; /* also sai tunnel id */
+	sai_ip_address_t       ipaddr;
+	sai_object_id_t        sai_tm_encap_id;
+	sai_object_id_t        sai_tm_decap_id;
+} mlnx_tunnel_t;
 
 typedef struct sai_db {
 	mlnx_port_t                   *ports_db[MAX_PORTS_DB];
@@ -74,6 +92,8 @@ typedef struct sai_db {
 	mlnx_virtual_router_t         *vrs_db[MAX_VRS_DB];
 	mlnx_router_interface_t       *router_interface_db[MAX_ROUTER_INTERFACE_DB];
 	mlnx_tunnel_map_t             *tunnel_map_db[MAX_TUNNEL_MAP_DB];
+	mlnx_tm_entry_t               *tm_entry_db[MAX_TM_ENTRY_DB];
+	mlnx_tunnel_t                 *tunnel_db[MAX_TUNNEL_DB];
 } sai_db_t;
 
 sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port_id,
@@ -119,3 +139,14 @@ sai_status_t mlnx_create_tunnel_map(
 	_In_ uint32_t attr_count,
 	_In_ const sai_attribute_t *attr_list);
 sai_status_t mlnx_remove_tunnel_map(_In_ sai_object_id_t sai_tunnel_map_id);
+sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_entry_id,
+					  _In_ sai_object_id_t        switch_id,
+					  _In_ uint32_t               attr_count,
+					  _In_ const sai_attribute_t *attr_list);
+sai_status_t mlnx_remove_tunnel_map_entry(_In_ sai_object_id_t sai_tm_entry_id);
+sai_status_t mlnx_create_tunnel(
+	_Out_ sai_object_id_t     * sai_tunnel_id,
+	_In_ sai_object_id_t        switch_id,
+	_In_ uint32_t               attr_count,
+	_In_ const sai_attribute_t* attr_list);
+sai_status_t mlnx_remove_tunnel(_In_ const sai_object_id_t sai_tunnel_id);

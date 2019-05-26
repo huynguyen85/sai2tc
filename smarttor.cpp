@@ -12,6 +12,9 @@ extern "C" {
 #define NUM_TEST_VR                               NUM_TEST_VLAN
 #define NUM_TEST_ROUTER_INTERFACE                 NUM_TEST_VLAN
 #define NUM_TEST_TUNNEL_MAP                       NUM_TEST_VLAN
+#define NUM_TEST_TM_ENTRY                         NUM_TEST_VLAN
+#define NUM_TEST_TUNNEL                           NUM_TEST_VLAN
+
 /********************************************************************/
 /* Switch                                                           */
 /********************************************************************/
@@ -50,6 +53,12 @@ int connect_to_switch() {
 	sai_object_id_t sai_vr_id[NUM_TEST_VR];
 	sai_object_id_t sai_ri_id[NUM_TEST_ROUTER_INTERFACE];
 	sai_object_id_t sai_tunnel_map_id[NUM_TEST_TUNNEL_MAP];
+	sai_object_id_t sai_tm_entry_id[NUM_TEST_TM_ENTRY];
+	sai_object_id_t sai_tunnel_id[NUM_TEST_TUNNEL];
+
+	sai_object_id_t    decap_mapper_list[] = {0};
+	sai_object_id_t    encap_mapper_list[] = {0};
+	sai_ip_address_t   ipaddr;
 	int i;
 
 	/* Get apis */
@@ -156,12 +165,70 @@ int connect_to_switch() {
 	for (i = 0; i < NUM_TEST_TUNNEL_MAP; i++) {
 		attrs.clear();
 
+		attr.id = SAI_TUNNEL_MAP_ATTR_TYPE;
+                attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VLAN_ID_TO_VNI;
+                attrs.push_back(attr);
+
 		status = sai_tunnel_api->create_tunnel_map(&sai_tunnel_map_id[i],
                                      			   gSwitchId,
 		                                           (uint32_t)attrs.size(),
 		                                           attrs.data());
 	
 		printf("sai_tunnel_map_id =%d\n", sai_tunnel_map_id[i]);
+	}
+
+	for (i = 0; i < NUM_TEST_TM_ENTRY; i++) {
+		attrs.clear();
+
+		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE;
+		attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VLAN_ID_TO_VNI;
+		attrs.push_back(attr);
+		
+		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP;
+		attr.value.oid = sai_tunnel_map_id[i];
+		attrs.push_back(attr);
+		
+		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY;
+		attr.value.oid = sai_vr_id[NUM_TEST_TM_ENTRY - i - 1];
+		attrs.push_back(attr);
+		
+		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE;
+		attr.value.s32 = 0x100 + i;
+		attrs.push_back(attr);
+
+		status = sai_tunnel_api->create_tunnel_map_entry(&sai_tm_entry_id[i],
+                                     			         gSwitchId,
+		                                                 (uint32_t)attrs.size(),
+		                                                 attrs.data());
+	
+		printf("sai_tm_entry_id =%d\n", sai_tm_entry_id[i]);
+	}
+
+	for (i = 0; i < NUM_TEST_TUNNEL; i++) {
+		attrs.clear();
+
+		attr.id = SAI_TUNNEL_ATTR_ENCAP_MAPPERS;
+		encap_mapper_list[0] = 0xEE00 + i;
+		attr.value.objlist.count = 1;
+		attr.value.objlist.list = encap_mapper_list;
+		attrs.push_back(attr);
+
+		attr.id = SAI_TUNNEL_ATTR_DECAP_MAPPERS;
+		decap_mapper_list[0] = 0xDD00 + i;
+		attr.value.objlist.count = 1;
+		attr.value.objlist.list = decap_mapper_list;
+		attrs.push_back(attr);
+
+		attr.id = SAI_TUNNEL_ATTR_ENCAP_SRC_IP;
+		attr.value.ipaddr.addr.ip4 = 0xAABBCC00 + i;
+		attrs.push_back(attr);
+
+		status = sai_tunnel_api->create_tunnel(&sai_tunnel_id[i],
+                                     		       gSwitchId,
+		                                       (uint32_t)attrs.size(),
+		                                       attrs.data());
+	
+		printf("sai_tunnel_id =%d\n", sai_tunnel_id[i]);
 	}
 
 	/* Clean up */
@@ -200,6 +267,18 @@ int connect_to_switch() {
 		status = sai_tunnel_api->remove_tunnel_map(sai_tunnel_map_id[i]);
 		if (SAI_ERR(status))
 			printf("clean tunnel map %d, sai_tunnel_map_id=%d, status=%x\n", i, sai_tunnel_map_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_TM_ENTRY; i++) {
+		status = sai_tunnel_api->remove_tunnel_map_entry(sai_tm_entry_id[i]);
+		if (SAI_ERR(status))
+			printf("clean tm entry %d, sai_tm_entry_id=%d, status=%x\n", i, sai_tm_entry_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_TUNNEL; i++) {
+		status = sai_tunnel_api->remove_tunnel(sai_tunnel_id[i]);
+		if (SAI_ERR(status))
+			printf("clean tunnel %d, sai_tunnel_id=%d, status=%x\n", i, sai_tunnel_id[i], status);
 	}
 
 	sai_api_uninitialize();
