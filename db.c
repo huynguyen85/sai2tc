@@ -2,6 +2,103 @@
 
 extern sai_db_t  *g_sai_db_ptr;
 
+static sai_status_t mlnx_nh_add(
+		sai_object_id_t        *sai_nh_id,
+		sai_object_id_t         sai_tunnel_id,
+		sai_ip_address_t       *ipaddr,
+		uint32_t                vni)
+{
+	mlnx_nexthop_t     *new_nh;
+	uint32_t            ii;
+
+	for (ii = 0; ii < MAX_NEXTHOP_DB; ii++) {
+		if (!g_sai_db_ptr->nexthop_db[ii]) {
+			g_sai_db_ptr->nexthop_db[ii] =
+				(mlnx_nexthop_t *) calloc (1, sizeof(*new_nh));
+			if (!g_sai_db_ptr->nexthop_db[ii])
+				return SAI_STATUS_NO_MEMORY;
+			new_nh = g_sai_db_ptr->nexthop_db[ii];
+
+			new_nh->sai_tunnel_id  = sai_tunnel_id;
+			new_nh->vni            = vni;
+			new_nh->index          = ii;
+			*sai_nh_id         = ii;
+			
+			memcpy(&new_nh->ipaddr, ipaddr, sizeof(sai_ip_address_t));
+			MLNX_SAI_DBG("SRC_IP ipv4=%lx\n", new_nh->ipaddr.addr.ip4);
+			return SAI_STATUS_SUCCESS;
+		}
+        }
+
+	return SAI_STATUS_TABLE_FULL;
+}
+
+static sai_status_t mlnx_nh_del(sai_object_id_t sai_nh_id)
+{
+	if (sai_nh_id >= MAX_NEXTHOP_DB)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	free(g_sai_db_ptr->nexthop_db[sai_nh_id]);
+	g_sai_db_ptr->nexthop_db[sai_nh_id] = NULL;
+
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
+				  _In_ sai_object_id_t        switch_id,
+				  _In_ uint32_t               attr_count,
+				  _In_ const sai_attribute_t *attr_list)
+{
+	sai_status_t  status = SAI_STATUS_NOT_IMPLEMENTED;
+	const sai_attribute_value_t *attr_val;
+	uint32_t                     attr_idx;
+	sai_object_id_t              sai_tunnel_id;
+	uint32_t                     vni;
+	sai_ip_address_t            *ipaddr;
+
+	MLNX_SAI_DBG("mlnx_create_next_hop\n");
+    
+	if (NULL == sai_next_hop_id) {
+		return SAI_STATUS_INVALID_PARAMETER;
+	}
+
+	status = find_attrib_in_list(attr_count, attr_list, SAI_NEXT_HOP_ATTR_TUNNEL_ID, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory SAI_NEXT_HOP_ATTR_TUNNEL_ID attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_NEXT_HOP_ATTR_TUNNEL_ID=%lx\n", attr_val->oid);
+	sai_tunnel_id = attr_val->oid;
+
+	status = find_attrib_in_list(attr_count, attr_list, SAI_NEXT_HOP_ATTR_IP, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory SAI_NEXT_HOP_ATTR_IP attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	ipaddr = &attr_val->ipaddr;
+
+	status = find_attrib_in_list(attr_count, attr_list, SAI_NEXT_HOP_ATTR_TUNNEL_VNI, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory SAI_NEXT_HOP_ATTR_TUNNEL_VNI attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_NEXT_HOP_ATTR_TUNNEL_VNI=%lx\n", attr_val->u32);
+	vni = attr_val->u32;
+
+	status = mlnx_nh_add(sai_next_hop_id, sai_tunnel_id, ipaddr, vni);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Failed to allocate next hop\n");
+	}
+	
+	return SAI_STATUS_SUCCESS;
+
+}
+
+sai_status_t mlnx_remove_next_hop(_In_ sai_object_id_t sai_next_hop_id)
+{
+	return mlnx_nh_del(sai_next_hop_id);
+}
+
 static sai_status_t mlnx_tunnel_add(
 		sai_object_id_t        *sai_tunnel_id,
 		sai_object_id_t         sai_tm_encap_id,
@@ -762,4 +859,31 @@ sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port
 sai_status_t mlnx_remove_bridge_port(_In_ sai_object_id_t sai_bridge_port_id)
 {
 	return mlnx_bridge_port_del(sai_bridge_port_id);
+}
+
+sai_status_t mlnx_create_switch(_Out_ sai_object_id_t      *switch_id,
+				_In_ uint32_t               attr_count,
+				_In_ const sai_attribute_t *attr_list)
+{
+	*switch_id = DEFAULT_SWITCH_ID;
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_remove_switch(_In_ sai_object_id_t switch_id)
+{
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_create_port(_Out_ sai_object_id_t      *port_id,
+			      _In_ sai_object_id_t        switch_id,
+			      _In_ uint32_t               attr_count,
+			      _In_ const sai_attribute_t *attr_list)
+{
+	*port_id = DEFAULT_PORT_ID;
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_remove_port(_In_ sai_object_id_t port_id)
+{
+	return SAI_STATUS_SUCCESS;
 }

@@ -14,6 +14,7 @@ extern "C" {
 #define NUM_TEST_TUNNEL_MAP                       NUM_TEST_VLAN
 #define NUM_TEST_TM_ENTRY                         NUM_TEST_VLAN
 #define NUM_TEST_TUNNEL                           NUM_TEST_VLAN
+#define NUM_TEST_NH                               NUM_TEST_VLAN
 
 /********************************************************************/
 /* Switch                                                           */
@@ -42,6 +43,7 @@ sai_vlan_api_t               *sai_vlan_api = NULL;
 sai_virtual_router_api_t     *sai_vr_api = NULL;
 sai_router_interface_api_t   *sai_router_interface_api = NULL;
 sai_tunnel_api_t             *sai_tunnel_api = NULL;
+sai_next_hop_api_t           *sai_next_hop_api = NULL;
 
 int connect_to_switch() {
 	sai_attribute_t attr;
@@ -55,6 +57,7 @@ int connect_to_switch() {
 	sai_object_id_t sai_tunnel_map_id[NUM_TEST_TUNNEL_MAP];
 	sai_object_id_t sai_tm_entry_id[NUM_TEST_TM_ENTRY];
 	sai_object_id_t sai_tunnel_id[NUM_TEST_TUNNEL];
+	sai_object_id_t sai_nh_id[NUM_TEST_NH];	
 
 	sai_object_id_t    decap_mapper_list[] = {0};
 	sai_object_id_t    encap_mapper_list[] = {0};
@@ -166,7 +169,7 @@ int connect_to_switch() {
 		attrs.clear();
 
 		attr.id = SAI_TUNNEL_MAP_ATTR_TYPE;
-                attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VLAN_ID_TO_VNI;
+                attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VIRTUAL_ROUTER_ID_TO_VNI;
                 attrs.push_back(attr);
 
 		status = sai_tunnel_api->create_tunnel_map(&sai_tunnel_map_id[i],
@@ -181,7 +184,7 @@ int connect_to_switch() {
 		attrs.clear();
 
 		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE;
-		attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VLAN_ID_TO_VNI;
+		attr.value.s32 = SAI_TUNNEL_MAP_TYPE_VIRTUAL_ROUTER_ID_TO_VNI;
 		attrs.push_back(attr);
 		
 		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP;
@@ -229,6 +232,34 @@ int connect_to_switch() {
 		                                       attrs.data());
 	
 		printf("sai_tunnel_id =%d\n", sai_tunnel_id[i]);
+	}
+
+
+	/* create nh */
+        sai_api_query(SAI_API_NEXT_HOP, (void**)&sai_next_hop_api);
+
+	for (i = 0; i < NUM_TEST_NH; i++) {
+                attrs.clear();
+
+		attr.id = SAI_NEXT_HOP_ATTR_IP;
+                attr.value.ipaddr.addr.ip4 = 0xEE00 + i;
+                attrs.push_back(attr);
+		
+		attr.id = SAI_NEXT_HOP_ATTR_TUNNEL_ID;
+                attr.value.oid = sai_tunnel_id[i];
+                attrs.push_back(attr);
+	
+		attr.id = SAI_NEXT_HOP_ATTR_TUNNEL_VNI;
+                attr.value.s32 = 0x200 + i;
+                attrs.push_back(attr);
+
+		status = sai_next_hop_api->create_next_hop(&sai_nh_id[i],
+                                                           gSwitchId,
+                                                           (uint32_t)attrs.size(),
+                                                           attrs.data());
+
+                printf("sai_nh_id =%d\n", sai_nh_id[i]);
+
 	}
 
 	/* Clean up */
@@ -279,6 +310,12 @@ int connect_to_switch() {
 		status = sai_tunnel_api->remove_tunnel(sai_tunnel_id[i]);
 		if (SAI_ERR(status))
 			printf("clean tunnel %d, sai_tunnel_id=%d, status=%x\n", i, sai_tunnel_id[i], status);
+	}
+
+	for (i = 0; i < NUM_TEST_NH; i++) {
+		status = sai_next_hop_api->remove_next_hop(sai_nh_id[i]);
+		if (SAI_ERR(status))
+			printf("clean next hop %d, sai_nh=%d, status=%x\n", i, sai_nh_id[i], status);
 	}
 
 	sai_api_uninitialize();

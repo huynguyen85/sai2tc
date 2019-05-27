@@ -72,6 +72,49 @@ const sai_tunnel_api_t mlnx_tunnel_api = {
 	NULL,//mlnx_get_tunnel_map_entry_attribute,
 };
 
+const sai_switch_api_t mlnx_switch_api = {
+	mlnx_create_switch,
+	mlnx_remove_switch,
+	NULL,//mlnx_set_switch_attribute,
+	NULL,//mlnx_get_switch_attribute,
+};
+
+const sai_port_api_t mlnx_port_api = {
+	mlnx_create_port,
+	mlnx_remove_port,
+	NULL,//mlnx_set_port_attribute,
+	NULL,//mlnx_get_port_attribute,
+	NULL,//mlnx_get_port_stats,
+	NULL,//mlnx_get_port_stats_ext,
+	NULL,//mlnx_clear_port_stats,
+	NULL,//mlnx_clear_port_all_stats,
+	NULL,//mlnx_create_port_pool,
+	NULL,//mlnx_remove_port_pool,
+	NULL,//mlnx_set_port_pool_attribute,
+	NULL,//mlnx_get_port_pool_attribute,
+	NULL,//mlnx_get_port_pool_stats,
+	NULL,//mlnx_get_port_pool_stats_ext,
+	NULL,//mlnx_clear_port_pool_stats
+};
+
+const sai_next_hop_api_t mlnx_next_hop_api = {
+	mlnx_create_next_hop,
+	mlnx_remove_next_hop,
+	NULL,//mlnx_set_next_hop_attribute,
+	NULL,//mlnx_get_next_hop_attribute
+};
+
+const sai_route_api_t mlnx_route_api = {
+	mlnx_create_route_entry,
+	mlnx_remove_route_entry,
+	NULL,//mlnx_set_route_attribute,
+	NULL,//mlnx_get_route_attribute,
+	NULL,//mlnx_bulk_create_route_entry,
+	NULL,//mlnx_bulk_remove_route_entry,
+	NULL,//mlnx_bulk_set_route_entry_attribute,
+	NULL,//mlnx_bulk_get_route_entry_attribute
+};
+
 /*
  * Routine Description:
  *     Retrieve a pointer to the C-style method table for desired SAI
@@ -99,6 +142,14 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
 	}
 
 	switch (sai_api_id) {
+	case SAI_API_SWITCH:
+        	*(const sai_switch_api_t**)api_method_table = &mlnx_switch_api;
+	        return SAI_STATUS_SUCCESS;
+
+	case SAI_API_PORT:
+		*(const sai_port_api_t**)api_method_table = &mlnx_port_api;
+		return SAI_STATUS_SUCCESS;
+
 	case SAI_API_BRIDGE:
 		*(const sai_bridge_api_t**)api_method_table = &mlnx_bridge_api;
 		return SAI_STATUS_SUCCESS;
@@ -117,6 +168,14 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
 
 	case SAI_API_TUNNEL:
 		*(const sai_tunnel_api_t**)api_method_table = &mlnx_tunnel_api;
+		return SAI_STATUS_SUCCESS;
+
+	case SAI_API_NEXT_HOP:
+		*(const sai_next_hop_api_t**)api_method_table = &mlnx_next_hop_api;
+		return SAI_STATUS_SUCCESS;
+
+	case SAI_API_ROUTE:
+		*(const sai_route_api_t**)api_method_table = &mlnx_route_api;
 		return SAI_STATUS_SUCCESS;
 
 	default:

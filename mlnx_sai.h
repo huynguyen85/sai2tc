@@ -2,6 +2,9 @@
 #include <netinet/in.h>
 #include <stdio.h>
 
+#define DEFAULT_SWITCH_ID            0x4682
+#define DEFAULT_PORT_ID              0x1234
+
 #define MAX_PORTS_DB                 128
 #define MAX_VLANS_DB                 1000
 #define MAX_BRIDGE_PORTS             128
@@ -11,7 +14,7 @@
 #define MAX_TUNNEL_MAP_DB            (MAX_VLANS_DB * 10)
 #define MAX_TM_ENTRY_DB              (MAX_VLANS_DB * 10)
 #define MAX_TUNNEL_DB                (MAX_VLANS_DB * 10)
-
+#define MAX_NEXTHOP_DB               (MAX_VLANS_DB * 10)
 
 #define MLNX_SAI_LOG(fmt, ...) printf(fmt, ## __VA_ARGS__)
 #define MLNX_SAI_DBG(fmt, ...) printf(fmt, ## __VA_ARGS__)
@@ -84,6 +87,13 @@ typedef struct mlnx_tunnel_t {
 	sai_object_id_t        sai_tm_decap_id;
 } mlnx_tunnel_t;
 
+typedef struct mlnx_nexthop_t {
+	uint32_t               index; /* also sai next hop id */
+	sai_ip_address_t       ipaddr;
+	uint32_t               vni;
+	sai_object_id_t        sai_tunnel_id;
+} mlnx_nexthop_t;
+
 typedef struct sai_db {
 	mlnx_port_t                   *ports_db[MAX_PORTS_DB];
 	mlnx_bridge_port_t            *bridge_ports_db[MAX_BRIDGE_PORTS];
@@ -94,6 +104,7 @@ typedef struct sai_db {
 	mlnx_tunnel_map_t             *tunnel_map_db[MAX_TUNNEL_MAP_DB];
 	mlnx_tm_entry_t               *tm_entry_db[MAX_TM_ENTRY_DB];
 	mlnx_tunnel_t                 *tunnel_db[MAX_TUNNEL_DB];
+	mlnx_nexthop_t                *nexthop_db[MAX_NEXTHOP_DB];
 } sai_db_t;
 
 sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port_id,
@@ -150,3 +161,17 @@ sai_status_t mlnx_create_tunnel(
 	_In_ uint32_t               attr_count,
 	_In_ const sai_attribute_t* attr_list);
 sai_status_t mlnx_remove_tunnel(_In_ const sai_object_id_t sai_tunnel_id);
+sai_status_t mlnx_create_switch(_Out_ sai_object_id_t      *switch_id,
+				_In_ uint32_t               attr_count,
+				_In_ const sai_attribute_t *attr_list);
+sai_status_t mlnx_remove_switch(_In_ sai_object_id_t switch_id);
+sai_status_t mlnx_create_port(_Out_ sai_object_id_t      *port_id,
+			      _In_ sai_object_id_t        switch_id,
+			      _In_ uint32_t               attr_count,
+			      _In_ const sai_attribute_t *attr_list);
+sai_status_t mlnx_remove_port(_In_ sai_object_id_t port_id);
+sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
+				  _In_ sai_object_id_t        switch_id,
+				  _In_ uint32_t               attr_count,
+				  _In_ const sai_attribute_t *attr_list);
+sai_status_t mlnx_remove_next_hop(_In_ sai_object_id_t sai_next_hop_id);
