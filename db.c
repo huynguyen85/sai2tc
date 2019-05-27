@@ -22,7 +22,7 @@ static sai_status_t mlnx_nh_add(
 			new_nh->sai_tunnel_id  = sai_tunnel_id;
 			new_nh->vni            = vni;
 			new_nh->index          = ii;
-			*sai_nh_id         = ii;
+			*sai_nh_id             = ii;
 			
 			memcpy(&new_nh->ipaddr, ipaddr, sizeof(sai_ip_address_t));
 			MLNX_SAI_DBG("SRC_IP ipv4=%lx\n", new_nh->ipaddr.addr.ip4);
@@ -885,5 +885,108 @@ sai_status_t mlnx_create_port(_Out_ sai_object_id_t      *port_id,
 
 sai_status_t mlnx_remove_port(_In_ sai_object_id_t port_id)
 {
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_create_route_entry(_In_ const sai_route_entry_t* route_entry,
+				     _In_ uint32_t                 attr_count,
+				     _In_ const sai_attribute_t   *attr_list)
+{
+	sai_status_t                 status = SAI_STATUS_NOT_IMPLEMENTED;
+	const sai_attribute_value_t *attr_val;
+	uint32_t                     attr_idx;
+	sai_object_id_t              sai_vr_id;
+	sai_object_id_t              sai_nh_id;
+	mlnx_nexthop_t              *nh;
+	mlnx_tunnel_t               *tunnel;
+	mlnx_tunnel_map_t           *tm_encap;
+	mlnx_tm_entry_t             *tm_entry;
+	mlnx_router_interface_t     *router_interface;
+	sai_object_id_t              sai_tm_encap_id;
+	sai_object_id_t              sai_vlan_id;
+	uint32_t                     vni;
+	uint16_t                     vlan_id;
+	int                          i;
+
+	MLNX_SAI_DBG("mlnx_create_route_entry\n");
+
+	if (NULL == route_entry)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	sai_vr_id = route_entry->vr_id;
+	
+	status = find_attrib_in_list(attr_count, attr_list, SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_LOG("Missing mandatory SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID=%lx\n", attr_val->oid);
+	sai_nh_id = attr_val->oid;
+
+	nh = g_sai_db_ptr->nexthop_db[sai_nh_id];
+	if (NULL == nh)
+		return SAI_STATUS_ITEM_NOT_FOUND;
+
+	tunnel = g_sai_db_ptr->tunnel_db[nh->sai_tunnel_id];
+ 	if (NULL == tunnel)
+		return SAI_STATUS_ITEM_NOT_FOUND;
+
+	tm_encap = g_sai_db_ptr->tunnel_map_db[tunnel->sai_tm_encap_id];
+ 	if (NULL == tm_encap)
+		return SAI_STATUS_ITEM_NOT_FOUND;
+
+	sai_tm_encap_id = tm_encap->index;
+
+	/* Use sai_tm_encap_id and sai_vr_id to find tm_entry */
+	for (i = 0; i < MAX_TM_ENTRY_DB; i++) {
+		tm_entry = g_sai_db_ptr->tm_entry_db[i];
+		if (NULL == tm_entry)
+			continue;
+		if ((tm_entry->sai_vr_id == sai_vr_id) &&
+		    (tm_entry->sai_tm_id == sai_tm_encap_id)) {
+			vni = tm_entry->vni;
+			break;
+		}
+
+	}
+
+	if (MAX_TM_ENTRY_DB == i) {
+		MLNX_SAI_DBG("Cannot find matching tm entry\n");
+		return SAI_STATUS_ITEM_NOT_FOUND;
+	}
+	/* Use vr_id to find vlan_id */
+	for (i = 0; i < MAX_ROUTER_INTERFACE_DB; i++) {
+		router_interface = g_sai_db_ptr->router_interface_db[i];
+		if (NULL == router_interface)
+			continue;
+		if (router_interface->sai_vr_id == sai_vr_id) {
+			sai_vlan_id = router_interface->sai_vlan_id;
+			vlan_id = g_sai_db_ptr->vlans_db[sai_vlan_id]->vlan_id;
+			break;
+		}
+
+	}
+
+	if (MAX_ROUTER_INTERFACE_DB == i) {
+		MLNX_SAI_DBG("Cannot find matching vlan\n");
+		return SAI_STATUS_ITEM_NOT_FOUND;
+	}
+
+	/* Found matching item */
+	MLNX_SAI_DBG("overlay ipv4=%lx\n", route_entry->destination.addr.ip4);
+	MLNX_SAI_DBG("tunnel_map vni=%x\n", vni);
+	MLNX_SAI_DBG("next_hop vni=%x\n", nh->vni);
+	MLNX_SAI_DBG("en_cap dst_ip ipv4=%lx\n", nh->ipaddr.addr.ip4);
+	MLNX_SAI_DBG("en_cap src_ip ipv4=%lx\n", tunnel->ipaddr.addr.ip4);
+	MLNX_SAI_DBG("vlan_id=%x\n", vlan_id);
+
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_remove_route_entry(_In_ const sai_route_entry_t* route_entry)
+{
+	if (NULL == route_entry)
+		return SAI_STATUS_INVALID_PARAMETER;
+
 	return SAI_STATUS_SUCCESS;
 }

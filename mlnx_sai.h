@@ -175,3 +175,7 @@ sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
 				  _In_ uint32_t               attr_count,
 				  _In_ const sai_attribute_t *attr_list);
 sai_status_t mlnx_remove_next_hop(_In_ sai_object_id_t sai_next_hop_id);
+sai_status_t mlnx_create_route_entry(_In_ const sai_route_entry_t* route_entry,
+				     _In_ uint32_t                 attr_count,
+				     _In_ const sai_attribute_t   *attr_list);
+sai_status_t mlnx_remove_route_entry(_In_ const sai_route_entry_t* route_entry);

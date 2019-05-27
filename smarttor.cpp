@@ -44,6 +44,8 @@ sai_virtual_router_api_t     *sai_vr_api = NULL;
 sai_router_interface_api_t   *sai_router_interface_api = NULL;
 sai_tunnel_api_t             *sai_tunnel_api = NULL;
 sai_next_hop_api_t           *sai_next_hop_api = NULL;
+sai_route_api_t              *sai_route_api = NULL;
+
 
 int connect_to_switch() {
 	sai_attribute_t attr;
@@ -59,10 +61,11 @@ int connect_to_switch() {
 	sai_object_id_t sai_tunnel_id[NUM_TEST_TUNNEL];
 	sai_object_id_t sai_nh_id[NUM_TEST_NH];	
 
+	sai_route_entry_t  route_entry;
+	sai_ip_prefix_t    ip_pfx;
 	sai_object_id_t    decap_mapper_list[] = {0};
 	sai_object_id_t    encap_mapper_list[] = {0};
-	sai_ip_address_t   ipaddr;
-	int i;
+	int i, test_index;
 
 	/* Get apis */
 	sai_api_initialize(0, (const sai_service_method_table_t *)&services);
@@ -135,9 +138,9 @@ int connect_to_switch() {
 		attrs.clear();
 
 		status = sai_vr_api->create_virtual_router(&sai_vr_id[i],
-                                   			     gSwitchId,
-		                                             (uint32_t)attrs.size(),
-		                                             attrs.data());
+                                   			   gSwitchId,
+		                                           (uint32_t)attrs.size(),
+		                                           attrs.data());
 	
 		printf("sai_vr_id =%d\n", sai_vr_id[i]);
 	}
@@ -147,10 +150,10 @@ int connect_to_switch() {
 	for (i = 0; i < NUM_TEST_ROUTER_INTERFACE; i++) {
 		attrs.clear();
 		attr.id = SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID;
-		attr.value.oid = i + 0x70;
+		attr.value.oid = i;
 		attrs.push_back(attr);
 		attr.id = SAI_ROUTER_INTERFACE_ATTR_VLAN_ID;
-		attr.value.oid = 0x80;
+		attr.value.oid = i;
 		attrs.push_back(attr);
 		
 		status = sai_router_interface_api->create_router_interface(
@@ -192,7 +195,7 @@ int connect_to_switch() {
 		attrs.push_back(attr);
 		
 		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY;
-		attr.value.oid = sai_vr_id[NUM_TEST_TM_ENTRY - i - 1];
+		attr.value.oid = sai_vr_id[i];
 		attrs.push_back(attr);
 		
 		attr.id = SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE;
@@ -211,13 +214,13 @@ int connect_to_switch() {
 		attrs.clear();
 
 		attr.id = SAI_TUNNEL_ATTR_ENCAP_MAPPERS;
-		encap_mapper_list[0] = 0xEE00 + i;
+		encap_mapper_list[0] = i;
 		attr.value.objlist.count = 1;
 		attr.value.objlist.list = encap_mapper_list;
 		attrs.push_back(attr);
 
 		attr.id = SAI_TUNNEL_ATTR_DECAP_MAPPERS;
-		decap_mapper_list[0] = 0xDD00 + i;
+		decap_mapper_list[0] = i;
 		attr.value.objlist.count = 1;
 		attr.value.objlist.list = decap_mapper_list;
 		attrs.push_back(attr);
@@ -261,6 +264,25 @@ int connect_to_switch() {
                 printf("sai_nh_id =%d\n", sai_nh_id[i]);
 
 	}
+
+	/* Create route */
+	sai_api_query(SAI_API_ROUTE, (void**)&sai_route_api);
+	
+	test_index = 2;
+	ip_pfx.addr_family = SAI_IP_ADDR_FAMILY_IPV4; 
+	ip_pfx.addr.ip4 = 0xABCD;
+
+	route_entry.vr_id = sai_vr_id[test_index];
+	route_entry.switch_id = gSwitchId;
+	route_entry.destination = ip_pfx;
+	
+	attr.id = SAI_ROUTE_ENTRY_ATTR_NEXT_HOP_ID;
+	attr.value.oid = sai_nh_id[test_index];
+	attrs.push_back(attr);
+	
+	status = sai_route_api->create_route_entry(&route_entry,
+	                                            static_cast<uint32_t> (attrs.size()),
+	                                            attrs.data());
 
 	/* Clean up */
 	printf("Clean up\n");
