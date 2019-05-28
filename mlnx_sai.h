@@ -4,6 +4,7 @@
 
 #define DEFAULT_SWITCH_ID            0x4682
 #define DEFAULT_PORT_ID              0x1234
+#define DEFAULT_SWITCH_ATTR_VR_ID    0x5678
 
 #define MAX_PORTS_DB                 128
 #define MAX_VLANS_DB                 1000
@@ -165,6 +166,9 @@ sai_status_t mlnx_create_switch(_Out_ sai_object_id_t      *switch_id,
 				_In_ uint32_t               attr_count,
 				_In_ const sai_attribute_t *attr_list);
 sai_status_t mlnx_remove_switch(_In_ sai_object_id_t switch_id);
+sai_status_t mlnx_get_switch_attribute(_In_ sai_object_id_t     switch_id,
+				       _In_ sai_uint32_t        attr_count,
+				       _Inout_ sai_attribute_t *attr_list);
 sai_status_t mlnx_create_port(_Out_ sai_object_id_t      *port_id,
 			      _In_ sai_object_id_t        switch_id,
 			      _In_ uint32_t               attr_count,

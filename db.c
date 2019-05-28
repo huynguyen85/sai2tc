@@ -874,6 +874,19 @@ sai_status_t mlnx_remove_switch(_In_ sai_object_id_t switch_id)
 	return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t mlnx_get_switch_attribute(_In_ sai_object_id_t     switch_id,
+				       _In_ sai_uint32_t        attr_count,
+				       _Inout_ sai_attribute_t *attr_list)
+{
+	if (attr_count != 1)
+		return SAI_STATUS_INVALID_PARAMETER;
+
+	attr_list[0].id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
+	attr_list[0].value.oid = DEFAULT_SWITCH_ATTR_VR_ID;
+
+	return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t mlnx_create_port(_Out_ sai_object_id_t      *port_id,
 			      _In_ sai_object_id_t        switch_id,
 			      _In_ uint32_t               attr_count,
@@ -990,3 +1003,4 @@ sai_status_t mlnx_remove_route_entry(_In_ const sai_route_entry_t* route_entry)
 
 	return SAI_STATUS_SUCCESS;
 }
+

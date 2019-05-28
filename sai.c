@@ -76,7 +76,7 @@ const sai_switch_api_t mlnx_switch_api = {
 	mlnx_create_switch,
 	mlnx_remove_switch,
 	NULL,//mlnx_set_switch_attribute,
-	NULL,//mlnx_get_switch_attribute,
+	mlnx_get_switch_attribute,
 };
 
 const sai_port_api_t mlnx_port_api = {
