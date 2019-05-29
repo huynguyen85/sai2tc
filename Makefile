@@ -1,5 +1,5 @@
 CFLAGS ?= -g -ftree-vectorize -Wformat=0
-CFLAGS += -pedantic -std=gnu99 -Wall -Wextra -I SAI/inc
+CFLAGS += -pedantic -std=gnu99 -Wall -Wextra -I inc/sai/inc
 #LIBS=-lm -lrt -libverbs -lhugetlbfs -lrdmacm -lpthread -lcap
 LIBS=-lm -lrt -lsai
 PREFIX=/usr/local
