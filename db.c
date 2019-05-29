@@ -463,6 +463,19 @@ sai_status_t mlnx_create_router_interface (
 		return SAI_STATUS_INVALID_PARAMETER;
 	}
 
+	status = find_attrib_in_list(attr_count, attr_list, SAI_ROUTER_INTERFACE_ATTR_TYPE, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory  SAI_ROUTER_INTERFACE_ATTR_TYPE attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	MLNX_SAI_DBG("SAI_ROUTER_INTERFACE_ATTR_TYPE=%lx\n", attr_val->u32);
+	if (SAI_ROUTER_INTERFACE_TYPE_VLAN != attr_val->u32) {
+		*sai_router_interface_id = rand();
+		if (*sai_router_interface_id < MAX_ROUTER_INTERFACE_DB)
+			*sai_router_interface_id += MAX_ROUTER_INTERFACE_DB;
+		return SAI_STATUS_SUCCESS;
+	}
+
 	status = find_attrib_in_list(attr_count, attr_list, SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID, &attr_val, &attr_idx);
 	if (SAI_ERR(status)) {
 		MLNX_SAI_ERR("Missing mandatory  SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID attr\n");
@@ -496,6 +509,9 @@ sai_status_t mlnx_create_router_interface (
  */
 sai_status_t mlnx_remove_router_interface (_In_ sai_object_id_t sai_router_interface_id)
 {
+	if (sai_router_interface_id >= MAX_ROUTER_INTERFACE_DB)
+		return SAI_STATUS_SUCCESS;
+
 	return mlnx_router_interface_del(sai_router_interface_id);
 }
 

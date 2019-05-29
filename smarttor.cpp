@@ -149,9 +149,14 @@ int connect_to_switch() {
 	sai_api_query(SAI_API_ROUTER_INTERFACE, (void**)&sai_router_interface_api);
 	for (i = 0; i < NUM_TEST_ROUTER_INTERFACE; i++) {
 		attrs.clear();
+		attr.id = SAI_ROUTER_INTERFACE_ATTR_TYPE;
+		attr.value.s32 = SAI_ROUTER_INTERFACE_TYPE_VLAN;
+		attrs.push_back(attr);
+
 		attr.id = SAI_ROUTER_INTERFACE_ATTR_VIRTUAL_ROUTER_ID;
 		attr.value.oid = i;
 		attrs.push_back(attr);
+
 		attr.id = SAI_ROUTER_INTERFACE_ATTR_VLAN_ID;
 		attr.value.oid = i;
 		attrs.push_back(attr);
