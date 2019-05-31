@@ -16,6 +16,8 @@ extern "C" {
 #define NUM_TEST_TUNNEL                           NUM_TEST_VLAN
 #define NUM_TEST_NH                               NUM_TEST_VLAN
 
+#define DEFAULT_SWITCH_ATTR_VR_ID    0x5678
+
 /********************************************************************/
 /* Switch                                                           */
 /********************************************************************/
@@ -65,6 +67,7 @@ int connect_to_switch() {
 	sai_ip_prefix_t    ip_pfx;
 	sai_object_id_t    decap_mapper_list[] = {0};
 	sai_object_id_t    encap_mapper_list[] = {0};
+	sai_object_id_t    term_table_id;
 	int i, test_index;
 
 	/* Get apis */
@@ -243,6 +246,31 @@ int connect_to_switch() {
 	}
 
 
+	/* create term table */
+	attrs.clear();	
+
+	attr.id = SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_VR_ID;
+	attr.value.oid = DEFAULT_SWITCH_ATTR_VR_ID; //default_vrid;
+	attrs.push_back(attr);
+	
+	attr.id = SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_DST_IP;
+	attr.value.ipaddr.addr.ip4 = 0xAABBCCFF;
+	attrs.push_back(attr);
+	
+	attr.id = SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_TUNNEL_TYPE;
+	attr.value.s32 = SAI_TUNNEL_TYPE_VXLAN;
+	attrs.push_back(attr);
+	
+	attr.id = SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_ACTION_TUNNEL_ID;
+	attr.value.oid = sai_tunnel_id[i];
+	attrs.push_back(attr);
+	
+	status = sai_tunnel_api->create_tunnel_term_table_entry(
+			&term_table_id,
+			gSwitchId,
+			(uint32_t)(attrs.size()),
+			attrs.data());
+
 	/* create nh */
         sai_api_query(SAI_API_NEXT_HOP, (void**)&sai_next_hop_api);
 
@@ -344,6 +372,10 @@ int connect_to_switch() {
 		if (SAI_ERR(status))
 			printf("clean next hop %d, sai_nh=%d, status=%x\n", i, sai_nh_id[i], status);
 	}
+
+	status = sai_tunnel_api->remove_tunnel_term_table_entry(term_table_id);
+	if (SAI_ERR(status))
+		printf("clean term table entry, term_table_id=%x, status=%x\n", term_table_id, status);
 
 	sai_api_uninitialize();
 	return 0;

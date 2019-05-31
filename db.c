@@ -917,6 +917,39 @@ sai_status_t mlnx_remove_port(_In_ sai_object_id_t port_id)
 	return SAI_STATUS_SUCCESS;
 }
 
+sai_status_t mlnx_create_tunnel_term_table_entry(
+	_Out_ sai_object_id_t      *sai_tunnel_term_table_entry_id,
+	_In_ sai_object_id_t        switch_id,
+	_In_ uint32_t               attr_count,
+	_In_ const sai_attribute_t *attr_list)
+{
+	MLNX_SAI_DBG("mlnx_create_tunnel_term_table_entry\n");
+	if (NULL != g_sai_db_ptr->term_table_entry)
+		return SAI_STATUS_TABLE_FULL;
+
+	g_sai_db_ptr->term_table_entry =
+		(mlnx_tunnel_term_table_entry_t *) calloc (1, sizeof(mlnx_tunnel_term_table_entry_t));
+
+	if (!g_sai_db_ptr->term_table_entry)
+		return SAI_STATUS_NO_MEMORY;
+
+	*sai_tunnel_term_table_entry_id = 0x6789;
+	return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t mlnx_remove_tunnel_term_table_entry(
+	_In_ const sai_object_id_t sai_tunnel_term_table_entry_id)
+{
+	MLNX_SAI_DBG("mlnx_remove_tunnel_term_table_entry\n");
+	if (NULL == g_sai_db_ptr->term_table_entry)
+		return SAI_STATUS_ITEM_NOT_FOUND;
+
+	free(g_sai_db_ptr->term_table_entry);
+	g_sai_db_ptr->term_table_entry = NULL;
+
+	return SAI_STATUS_SUCCESS;
+}
+
 sai_status_t mlnx_create_route_entry(_In_ const sai_route_entry_t* route_entry,
 				     _In_ uint32_t                 attr_count,
 				     _In_ const sai_attribute_t   *attr_list)
