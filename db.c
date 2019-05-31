@@ -526,7 +526,7 @@ static sai_status_t mlnx_virtual_router_add(sai_object_id_t *sai_vr_id)
 				(mlnx_virtual_router_t *) calloc (1, sizeof(*new_vr));
 			if (!g_sai_db_ptr->vrs_db[ii])
 				return SAI_STATUS_NO_MEMORY;
-			new_vr = g_sai_db_ptr->vlan_members_db[ii];
+			new_vr = g_sai_db_ptr->vrs_db[ii];
 
 			new_vr->index    = ii;
 			*sai_vr_id       = ii;
