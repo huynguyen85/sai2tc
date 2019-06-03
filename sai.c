@@ -196,6 +196,14 @@ sai_status_t sai_api_query(_In_ sai_api_t sai_api_id, _Out_ void** api_method_ta
  */
 sai_object_type_t sai_object_type_query(_In_ sai_object_id_t sai_object_id)
 {
+	if (sai_object_id == DEFAULT_SWITCH_ID) {
+		return SAI_OBJECT_TYPE_SWITCH;
+	}
+	
+	if (sai_object_id == DEFAULT_SWITCH_ATTR_VR_ID) {
+		return SAI_OBJECT_TYPE_VIRTUAL_ROUTER;
+	}
+
 	return SAI_OBJECT_TYPE_NULL;
 }
 
