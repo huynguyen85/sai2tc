@@ -1,6 +1,8 @@
 #include <sai.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define DEFAULT_SWITCH_ID            0x4682
 #define DEFAULT_PORT_ID              0x1234
