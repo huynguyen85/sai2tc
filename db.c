@@ -200,7 +200,8 @@ static sai_status_t mlnx_tm_entry_add(
 		sai_object_id_t        *sai_tm_entry_id,
 		sai_object_id_t         sai_vr_id,
 		sai_object_id_t         sai_tm_id,
-		uint32_t                vni)
+		uint32_t                vni,
+		int32_t                 type)
 {
 	mlnx_tm_entry_t     *new_tm_entry;
 	uint32_t             ii;
@@ -216,6 +217,7 @@ static sai_status_t mlnx_tm_entry_add(
 			new_tm_entry->sai_vr_id        = sai_vr_id;
 			new_tm_entry->sai_tm_id        = sai_tm_id;
 			new_tm_entry->vni              = vni;
+			new_tm_entry->type             = type;
 			new_tm_entry->index            = ii;
 			*sai_tm_entry_id               = ii;
 			return SAI_STATUS_SUCCESS;
@@ -257,20 +259,13 @@ sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_ent
 	sai_object_id_t              sai_vr_id;
 	sai_object_id_t              sai_tm_id;
 	uint32_t                     vni;
+	int32_t                      type;
 
 	MLNX_SAI_DBG("mlnx_create_tunnel_map_entry\n");
     
 	if (NULL == sai_tm_entry_id) {
 		return SAI_STATUS_INVALID_PARAMETER;
 	}
-
-	status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY, &attr_val, &attr_idx);
-	if (SAI_ERR(status)) {
-		MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY attr\n");
-		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
-	}
-	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY=%lx\n", attr_val->oid);
-	sai_vr_id = attr_val->oid;
 
 	status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP, &attr_val, &attr_idx);
 	if (SAI_ERR(status)) {
@@ -280,15 +275,51 @@ sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_ent
 	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP=%lx\n", attr_val->oid);
 	sai_tm_id = attr_val->oid;
 
-	status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE, &attr_val, &attr_idx);
+	status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE, &attr_val, &attr_idx);
 	if (SAI_ERR(status)) {
-		MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE attr\n");
+		MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE attr\n");
 		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 	}
-	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%lx\n", attr_val->u32);
-	vni = attr_val->u32;
+	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE=%lx\n", attr_val->s32);
+	type = attr_val->s32;
 
-	status = mlnx_tm_entry_add(sai_tm_entry_id, sai_vr_id, sai_tm_id, vni);
+	if (type == SAI_TUNNEL_MAP_TYPE_VIRTUAL_ROUTER_ID_TO_VNI) {
+		status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY, &attr_val, &attr_idx);
+		if (SAI_ERR(status)) {
+			MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY attr\n");
+			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+		}
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_KEY=%lx\n", attr_val->oid);
+		sai_vr_id = attr_val->oid;
+	
+		status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE, &attr_val, &attr_idx);
+		if (SAI_ERR(status)) {
+			MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE attr\n");
+			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+		}
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%lx\n", attr_val->u32);
+		vni = attr_val->u32;
+	} else if (type == SAI_TUNNEL_MAP_TYPE_VNI_TO_VIRTUAL_ROUTER_ID) {
+		status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_VALUE, &attr_val, &attr_idx);
+		if (SAI_ERR(status)) {
+			MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_VALUE attr\n");
+			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+		}
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_VALUE=%lx\n", attr_val->oid);
+		sai_vr_id = attr_val->oid;
+	
+		status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_KEY, &attr_val, &attr_idx);
+		if (SAI_ERR(status)) {
+			MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE attr\n");
+			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+		}
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%lx\n", attr_val->u32);
+		vni = attr_val->u32;
+	} else {
+		MLNX_SAI_ERR("Not support SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE=%d\n", type);
+	}
+
+	status = mlnx_tm_entry_add(sai_tm_entry_id, sai_vr_id, sai_tm_id, vni, type);
 	if (SAI_ERR(status)) {
 		MLNX_SAI_ERR("Failed to allocate tunnel map entry\n");
 	}

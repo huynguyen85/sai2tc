@@ -82,6 +82,7 @@ typedef struct mlnx_tm_entry_t {
 	sai_object_id_t        sai_vr_id;
 	sai_object_id_t        sai_tm_id; /* sai tunnel map id */
 	uint32_t               vni;
+	int32_t                type;
 } mlnx_tm_entry_t;
 
 typedef struct mlnx_tunnel_t {
