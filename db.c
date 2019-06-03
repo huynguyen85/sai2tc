@@ -5,8 +5,7 @@ extern sai_db_t  *g_sai_db_ptr;
 static sai_status_t mlnx_nh_add(
 		sai_object_id_t        *sai_nh_id,
 		sai_object_id_t         sai_tunnel_id,
-		sai_ip_address_t       *ipaddr,
-		uint32_t                vni)
+		sai_ip_address_t       *ipaddr)
 {
 	mlnx_nexthop_t     *new_nh;
 	uint32_t            ii;
@@ -20,7 +19,6 @@ static sai_status_t mlnx_nh_add(
 			new_nh = g_sai_db_ptr->nexthop_db[ii];
 
 			new_nh->sai_tunnel_id  = sai_tunnel_id;
-			new_nh->vni            = vni;
 			new_nh->index          = ii;
 			*sai_nh_id             = ii;
 			
@@ -53,7 +51,6 @@ sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
 	const sai_attribute_value_t *attr_val;
 	uint32_t                     attr_idx;
 	sai_object_id_t              sai_tunnel_id;
-	uint32_t                     vni;
 	sai_ip_address_t            *ipaddr;
 
 	MLNX_SAI_DBG("mlnx_create_next_hop\n");
@@ -77,15 +74,7 @@ sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
 	}
 	ipaddr = &attr_val->ipaddr;
 
-	status = find_attrib_in_list(attr_count, attr_list, SAI_NEXT_HOP_ATTR_TUNNEL_VNI, &attr_val, &attr_idx);
-	if (SAI_ERR(status)) {
-		MLNX_SAI_ERR("Missing mandatory SAI_NEXT_HOP_ATTR_TUNNEL_VNI attr\n");
-		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
-	}
-	MLNX_SAI_DBG("SAI_NEXT_HOP_ATTR_TUNNEL_VNI=%lx\n", attr_val->u32);
-	vni = attr_val->u32;
-
-	status = mlnx_nh_add(sai_next_hop_id, sai_tunnel_id, ipaddr, vni);
+	status = mlnx_nh_add(sai_next_hop_id, sai_tunnel_id, ipaddr);
 	if (SAI_ERR(status)) {
 		MLNX_SAI_ERR("Failed to allocate next hop\n");
 	}
@@ -1068,7 +1057,6 @@ sai_status_t mlnx_create_route_entry(_In_ const sai_route_entry_t* route_entry,
 	/* Found matching item */
 	MLNX_SAI_DBG("overlay ipv4=%lx\n", route_entry->destination.addr.ip4);
 	MLNX_SAI_DBG("tunnel_map vni=%x\n", vni);
-	MLNX_SAI_DBG("next_hop vni=%x\n", nh->vni);
 	MLNX_SAI_DBG("en_cap dst_ip ipv4=%lx\n", nh->ipaddr.addr.ip4);
 	MLNX_SAI_DBG("en_cap src_ip ipv4=%lx\n", tunnel->ipaddr.addr.ip4);
 	MLNX_SAI_DBG("vlan_id=%x\n", vlan_id);

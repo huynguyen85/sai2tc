@@ -95,7 +95,6 @@ typedef struct mlnx_tunnel_t {
 typedef struct mlnx_nexthop_t {
 	uint32_t               index; /* also sai next hop id */
 	sai_ip_address_t       ipaddr;
-	uint32_t               vni;
 	sai_object_id_t        sai_tunnel_id;
 } mlnx_nexthop_t;
 
