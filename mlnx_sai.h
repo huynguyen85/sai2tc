@@ -3,41 +3,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #define DEFAULT_SWITCH_ID            0x4682
 #define DEFAULT_PORT_ID              0x1234
 #define DEFAULT_SWITCH_ATTR_VR_ID    0x5678
 #define DEFAULT_TERM_TABLE_ENTRY     0x6789
+#define DEFAULT_TUNNEL_ID            0x789A
 
-#define MAX_PORTS_DB                 128
+#define MAX_PORTS_DB                 1
+#define MAX_BRIDGE_PORTS             1
 #define MAX_VLANS_DB                 1000
-#define MAX_BRIDGE_PORTS             128
-#define MAX_VLAN_MEMBERS_DB          (MAX_VLANS_DB * MAX_BRIDGE_PORTS / 1000)
-#define MAX_VRS_DB                   MAX_VLANS_DB
-#define MAX_ROUTER_INTERFACE_DB      MAX_VLANS_DB
-#define MAX_TUNNEL_MAP_DB            (MAX_VLANS_DB * 10)
-#define MAX_TM_ENTRY_DB              (MAX_VLANS_DB * 10)
-#define MAX_TUNNEL_DB                (MAX_VLANS_DB * 10)
-#define MAX_NEXTHOP_DB               (MAX_VLANS_DB * 10)
+#define MAX_VLAN_MEMBERS_DB          (MAX_VLANS_DB * MAX_BRIDGE_PORTS)
+#define MAX_VRS_DB                   (MAX_VLANS_DB * MAX_TUNNEL_MAP_DB)
+#define MAX_ROUTER_INTERFACE_DB      (MAX_VLANS_DB * MAX_TUNNEL_MAP_DB)
+#define MAX_TUNNEL_MAP_DB            2
+#define MAX_TM_ENTRY_DB              (MAX_VLANS_DB * MAX_TUNNEL_MAP_DB)
+#define MAX_NEXTHOP_DB               MAX_VLANS_DB
+#define MAX_ROUTE_ENTRY_DB           MAX_VLANS_DB
 
 #define MLNX_SAI_LOG(fmt, ...) printf(fmt, ## __VA_ARGS__)
 #define MLNX_SAI_DBG(fmt, ...) printf(fmt, ## __VA_ARGS__)
+//#define MLNX_SAI_DBG(fmt, ...) 
 #define MLNX_SAI_ERR(fmt, ...) printf(fmt, ## __VA_ARGS__)
 
 #define SAI_ERR(status) ((status) != SAI_STATUS_SUCCESS)
-
-enum set_tunnel_tc_action {
-	TC_ADD,
-	TC_DEL
-};
-
-struct tc_flower_tunnel_info {
-	enum set_tunnel_tc_action  tc_action;
-	struct sockaddr           *inner_ip;
-	struct sockaddr           *outer_ip;
-	unsigned int               vxlan_id;
-        unsigned int               udp_port;
-};
 
 int modify_tc_flower_tunnel (struct tc_flower_tunnel_info *tun_info);
 
@@ -102,6 +92,18 @@ typedef struct mlnx_tunnel_term_table_entry_t {
 	sai_object_id_t        sai_tunnel_id;
 } mlnx_tunnel_term_table_entry_t;
 
+typedef struct mlnx_route_entry_t {
+	uint32_t               index;
+	sai_object_id_t        sai_vr_id;
+	sai_ip_address_t       olay_dst_ip;
+
+	/* encap rule */
+	uint32_t               vni;
+	uint16_t               vlan_id;
+	sai_ip_address_t       src_ip;
+	sai_ip_address_t       dst_ip;
+} mlnx_route_entry_t;
+
 typedef struct sai_db {
 	mlnx_port_t                     *ports_db[MAX_PORTS_DB];
 	mlnx_bridge_port_t              *bridge_ports_db[MAX_BRIDGE_PORTS];
@@ -111,8 +113,9 @@ typedef struct sai_db {
 	mlnx_router_interface_t         *router_interface_db[MAX_ROUTER_INTERFACE_DB];
 	mlnx_tunnel_map_t               *tunnel_map_db[MAX_TUNNEL_MAP_DB];
 	mlnx_tm_entry_t                 *tm_entry_db[MAX_TM_ENTRY_DB];
-	mlnx_tunnel_t                   *tunnel_db[MAX_TUNNEL_DB];
+	mlnx_tunnel_t                   *tunnel;
 	mlnx_nexthop_t                  *nexthop_db[MAX_NEXTHOP_DB];
+	mlnx_route_entry_t              *route_entry_db[MAX_ROUTE_ENTRY_DB];
 	mlnx_tunnel_term_table_entry_t  *term_table_entry;
 } sai_db_t;
 
@@ -122,12 +125,6 @@ sai_status_t mlnx_create_bridge_port(_Out_ sai_object_id_t      *sai_bridge_port
 				     _In_ const sai_attribute_t *attr_list);
 
 sai_status_t mlnx_remove_bridge_port(_In_ sai_object_id_t bridge_port_id);
-
-sai_status_t find_attrib_in_list(_In_ uint32_t                       attr_count,
-				 _In_ const sai_attribute_t         *attr_list,
-				 _In_ sai_attr_id_t                  attrib_id,
-				 _Out_ const sai_attribute_value_t **attr_value,
-				 _Out_ uint32_t                     *index);
 
 sai_status_t mlnx_create_vlan(_Out_ sai_object_id_t      *sai_vlan_id,
                               _In_ sai_object_id_t        switch_id,
@@ -198,3 +195,16 @@ sai_status_t mlnx_create_tunnel_term_table_entry(
 	_In_ const sai_attribute_t *attr_list);
 sai_status_t mlnx_remove_tunnel_term_table_entry(
 	_In_ const sai_object_id_t sai_tunnel_term_table_entry_id);
+
+/* sai utilities */
+sai_status_t find_attrib_in_list(_In_ uint32_t                       attr_count,
+				 _In_ const sai_attribute_t         *attr_list,
+				 _In_ sai_attr_id_t                  attrib_id,
+				 _Out_ const sai_attribute_value_t **attr_value,
+				 _Out_ uint32_t                     *index);
+sai_status_t sai_serialize_ip4(
+	_Out_ char *buffer,
+	_In_ sai_ip4_t ip4);
+sai_status_t ip2string(
+	_Out_ char *buffer,
+	_In_  sai_ip_address_t *ipaddr);
