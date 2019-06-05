@@ -987,13 +987,13 @@ static sai_status_t execute_decap_tc_cmd(const char action[],
 	}
 
 	sprintf(tc_cmd,
-		"tc filter add dev %s protocol 0x800 parent ffff: prio 2 flower ip_flags nofrag "
+		"tc filter %s dev %s protocol 0x800 parent ffff: prio 2 flower ip_flags nofrag "
 		"enc_dst_ip %s enc_key_id %d enc_dst_port 4789 action tunnel_key unset action vlan push id %d "
 		"action mirred egress redirect dev %s",
-		VXLAN_DEV, buf_dst, vni, vlan_id, P1_DEV);
+		action, VXLAN_DEV, buf_dst, vni, vlan_id, P1_DEV);
 
 	MLNX_SAI_LOG("%s\n", tc_cmd);
-	system(tc_cmd);
+	//system(tc_cmd);
 
 	return SAI_STATUS_SUCCESS;
 }
@@ -1085,9 +1085,9 @@ sai_status_t mlnx_remove_tunnel_term_table_entry(
 	if (NULL == g_sai_db_ptr->term_table_entry)
 		return SAI_STATUS_ITEM_NOT_FOUND;
 
+	mlnx_modify_all_decap_rules("del");
 	free(g_sai_db_ptr->term_table_entry);
 	g_sai_db_ptr->term_table_entry = NULL;
-	mlnx_modify_all_decap_rules("del");
 
 	return SAI_STATUS_SUCCESS;
 }

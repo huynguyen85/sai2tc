@@ -4,6 +4,7 @@ extern "C" {
 #include "sai.h"
 }
 #include <arpa/inet.h>
+#include <stdio.h>
 
 #define SAI_ERR(status) ((status) != SAI_STATUS_SUCCESS)
 
@@ -366,6 +367,11 @@ int connect_to_switch() {
 
 	/* Clean up */
 	printf("Clean up\n");
+	status = sai_tunnel_api->remove_tunnel_term_table_entry(term_table_id);
+	if (SAI_ERR(status))
+		printf("clean term table entry, term_table_id=%x, status=%x\n", term_table_id, status);
+
+
 	for (i = 0; i < NUM_TEST_BRIDGE; i++) {
 		status = sai_bridge_api->remove_bridge_port(sai_bridge_port_id[i]);
 		if (SAI_ERR(status))
@@ -417,10 +423,6 @@ int connect_to_switch() {
 		if (SAI_ERR(status))
 			printf("clean next hop %d, sai_nh=%d, status=%x\n", i, sai_nh_id[i], status);
 	}
-
-	status = sai_tunnel_api->remove_tunnel_term_table_entry(term_table_id);
-	if (SAI_ERR(status))
-		printf("clean term table entry, term_table_id=%x, status=%x\n", term_table_id, status);
 
 	status = sai_route_api->remove_route_entry(&route_entry);
 	if (SAI_ERR(status))
