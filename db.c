@@ -1,8 +1,8 @@
 #include "mlnx_sai.h"
 
 extern sai_db_t  *g_sai_db_ptr;
-#define IP_STRING_SIZE 100
-#define TC_CMD_SIZE    1000
+#define IP_STRING_SIZE 50
+#define TC_CMD_SIZE    300
 
 #define P1_DEV     "ens1f0"
 #define P2_DEV     "ens1f1"
@@ -11,6 +11,9 @@ extern sai_db_t  *g_sai_db_ptr;
 char  buf_src[IP_STRING_SIZE];
 char  buf_dst[IP_STRING_SIZE];
 char  tc_cmd[TC_CMD_SIZE];
+
+static void modify_single_decap(mlnx_tm_entry_t  *tm_entry,
+				const char action[]);
 
 static sai_status_t find_vlan_id_from_vr_id (sai_object_id_t sai_vr_id,
 					     uint16_t *vlan_id)
@@ -41,9 +44,9 @@ static sai_status_t find_vlan_id_from_vr_id (sai_object_id_t sai_vr_id,
 }
 	
 static sai_status_t mlnx_nh_add(
-		sai_object_id_t        *sai_nh_id,
-		sai_object_id_t         sai_tunnel_id,
-		sai_ip_address_t       *ipaddr)
+		sai_object_id_t         *sai_nh_id,
+		sai_object_id_t          sai_tunnel_id,
+		const sai_ip_address_t  *ipaddr)
 {
 	mlnx_nexthop_t     *new_nh;
 	uint32_t            ii;
@@ -61,7 +64,6 @@ static sai_status_t mlnx_nh_add(
 			*sai_nh_id             = ii;
 			
 			memcpy(&new_nh->ipaddr, ipaddr, sizeof(sai_ip_address_t));
-			MLNX_SAI_DBG("SRC_IP ipv4=%lx\n", new_nh->ipaddr.addr.ip4);
 			return SAI_STATUS_SUCCESS;
 		}
         }
@@ -89,7 +91,7 @@ sai_status_t mlnx_create_next_hop(_Out_ sai_object_id_t      *sai_next_hop_id,
 	const sai_attribute_value_t *attr_val;
 	uint32_t                     attr_idx;
 	sai_object_id_t              sai_tunnel_id;
-	sai_ip_address_t            *ipaddr;
+	const sai_ip_address_t      *ipaddr;
 
 	MLNX_SAI_DBG("mlnx_create_next_hop\n");
     
@@ -127,10 +129,10 @@ sai_status_t mlnx_remove_next_hop(_In_ sai_object_id_t sai_next_hop_id)
 }
 
 static sai_status_t mlnx_tunnel_add(
-		sai_object_id_t        *sai_tunnel_id,
-		sai_object_id_t         sai_tm_encap_id,
-		sai_object_id_t         sai_tm_decap_id,
-		sai_ip_address_t       *ipaddr)
+		sai_object_id_t         *sai_tunnel_id,
+		sai_object_id_t          sai_tm_encap_id,
+		sai_object_id_t          sai_tm_decap_id,
+		const sai_ip_address_t  *ipaddr)
 {
 	mlnx_tunnel_t     *new_tunnel;
 
@@ -174,7 +176,7 @@ sai_status_t mlnx_create_tunnel(
 	uint32_t                     attr_idx;
 	sai_object_id_t              sai_tm_encap_id;
 	sai_object_id_t              sai_tm_decap_id;
-	sai_ip_address_t            *ipaddr;
+	const sai_ip_address_t      *ipaddr;
 
 	MLNX_SAI_DBG("mlnx_create_tunnel\n");
     
@@ -242,6 +244,10 @@ static sai_status_t mlnx_tm_entry_add(
 			new_tm_entry->type             = type;
 			new_tm_entry->index            = ii;
 			*sai_tm_entry_id               = ii;
+
+			if (NULL != g_sai_db_ptr->term_table_entry)
+				modify_single_decap(new_tm_entry, "add");
+
 			return SAI_STATUS_SUCCESS;
 		}
         }
@@ -253,6 +259,9 @@ static sai_status_t mlnx_tm_entry_del(sai_object_id_t sai_tm_entry_id)
 {
 	if (sai_tm_entry_id >= MAX_TM_ENTRY_DB)
 		return SAI_STATUS_INVALID_PARAMETER;
+
+	if (NULL != g_sai_db_ptr->term_table_entry)
+		modify_single_decap(g_sai_db_ptr->tm_entry_db[sai_tm_entry_id], "del");
 
 	free(g_sai_db_ptr->tm_entry_db[sai_tm_entry_id]);
 	g_sai_db_ptr->tm_entry_db[sai_tm_entry_id] = NULL;
@@ -302,7 +311,7 @@ sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_ent
 		MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE attr\n");
 		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 	}
-	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE=%lx\n", attr_val->s32);
+	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE=%x\n", attr_val->s32);
 	type = attr_val->s32;
 
 	if (type == SAI_TUNNEL_MAP_TYPE_VIRTUAL_ROUTER_ID_TO_VNI) {
@@ -319,7 +328,7 @@ sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_ent
 			MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE attr\n");
 			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 		}
-		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%lx\n", attr_val->u32);
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%x\n", attr_val->u32);
 		vni = attr_val->u32;
 	} else if (type == SAI_TUNNEL_MAP_TYPE_VNI_TO_VIRTUAL_ROUTER_ID) {
 		status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_MAP_ENTRY_ATTR_VIRTUAL_ROUTER_ID_VALUE, &attr_val, &attr_idx);
@@ -335,7 +344,7 @@ sai_status_t mlnx_create_tunnel_map_entry(_Out_ sai_object_id_t      *sai_tm_ent
 			MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE attr\n");
 			return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 		}
-		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%lx\n", attr_val->u32);
+		MLNX_SAI_DBG("SAI_TUNNEL_MAP_ENTRY_ATTR_VNI_ID_VALUE=%x\n", attr_val->u32);
 		vni = attr_val->u32;
 	} else {
 		MLNX_SAI_ERR("Not support SAI_TUNNEL_MAP_ENTRY_ATTR_TUNNEL_MAP_TYPE=%d\n", type);
@@ -427,7 +436,7 @@ sai_status_t mlnx_create_tunnel_map(
 		MLNX_SAI_ERR("Missing mandatory  SAI_TUNNEL_MAP_ATTR_TYPE attr\n");
 		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 	}
-	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ATTR_TYPE=%lx\n", attr_val->s32);
+	MLNX_SAI_DBG("SAI_TUNNEL_MAP_ATTR_TYPE=%x\n", attr_val->s32);
 	type = attr_val->s32;
 
 	status = mlnx_tunnel_map_add(sai_tunnel_map_id, type);
@@ -521,7 +530,7 @@ sai_status_t mlnx_create_router_interface (
 		MLNX_SAI_ERR("Missing mandatory  SAI_ROUTER_INTERFACE_ATTR_TYPE attr\n");
 		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
 	}
-	MLNX_SAI_DBG("SAI_ROUTER_INTERFACE_ATTR_TYPE=%lx\n", attr_val->u32);
+	MLNX_SAI_DBG("SAI_ROUTER_INTERFACE_ATTR_TYPE=%x\n", attr_val->u32);
 	if (SAI_ROUTER_INTERFACE_TYPE_VLAN != attr_val->u32) {
 		*sai_router_interface_id = rand();
 		if (*sai_router_interface_id < MAX_ROUTER_INTERFACE_DB)
@@ -987,15 +996,37 @@ static sai_status_t execute_decap_tc_cmd(const char action[],
 	}
 
 	sprintf(tc_cmd,
-		"tc filter add dev %s protocol 0x800 parent ffff: prio 2 flower ip_flags nofrag "
+		"tc filter %s dev %s protocol 0x800 parent ffff: prio 2 flower ip_flags nofrag "
 		"enc_dst_ip %s enc_key_id %d enc_dst_port 4789 action tunnel_key unset action vlan push id %d "
 		"action mirred egress redirect dev %s",
-		VXLAN_DEV, buf_dst, vni, vlan_id, P1_DEV);
+		action, VXLAN_DEV, buf_dst, vni, vlan_id, P1_DEV);
 
 	MLNX_SAI_LOG("%s\n", tc_cmd);
-	system(tc_cmd);
+	//system(tc_cmd);
 
 	return SAI_STATUS_SUCCESS;
+}
+
+static void modify_single_decap(mlnx_tm_entry_t  *tm_entry,
+				const char action[])
+{
+	sai_object_id_t        sai_vr_id;
+	uint16_t               vlan_id;
+	uint32_t               vni;
+	sai_status_t           status;
+
+	if (tm_entry->type != SAI_TUNNEL_MAP_TYPE_VNI_TO_VIRTUAL_ROUTER_ID)
+		return;
+
+	vni = tm_entry->vni;
+	sai_vr_id = tm_entry->sai_vr_id;
+	status = find_vlan_id_from_vr_id(sai_vr_id, &vlan_id);
+	if (status)
+		return;
+
+	MLNX_SAI_DBG("decap vni=%d, vlan_id=%d\n", vni, vlan_id);
+	status = execute_decap_tc_cmd(action, vni, vlan_id);
+
 }
 
 static sai_status_t mlnx_modify_all_decap_rules(const char action[])
@@ -1038,7 +1069,7 @@ sai_status_t mlnx_create_tunnel_term_table_entry(
 	const sai_attribute_value_t *attr_val;
 	uint32_t                     attr_idx;
 	sai_object_id_t              sai_tunnel_id;
-	sai_ip_address_t            *ipaddr;
+	const sai_ip_address_t      *ipaddr;
 	
 	MLNX_SAI_DBG("mlnx_create_tunnel_term_table_entry\n");
 	if (NULL != g_sai_db_ptr->term_table_entry)
@@ -1085,9 +1116,9 @@ sai_status_t mlnx_remove_tunnel_term_table_entry(
 	if (NULL == g_sai_db_ptr->term_table_entry)
 		return SAI_STATUS_ITEM_NOT_FOUND;
 
+	mlnx_modify_all_decap_rules("del");
 	free(g_sai_db_ptr->term_table_entry);
 	g_sai_db_ptr->term_table_entry = NULL;
-	mlnx_modify_all_decap_rules("del");
 
 	return SAI_STATUS_SUCCESS;
 }
@@ -1104,7 +1135,7 @@ static void mlnx_find_route_entry(
 
 	sai_vr_id = route_entry->vr_id;
 	if (sai_vr_id >= MAX_VRS_DB)
-		return SAI_STATUS_INVALID_PARAMETER;
+		return;
 
 	for (ii = 0; ii < MAX_ROUTE_ENTRY_DB; ii++) {
 		if (!g_sai_db_ptr->route_entry_db[ii])
@@ -1223,15 +1254,15 @@ static sai_status_t add_encap_rule(mlnx_route_entry_t        *new_re,
 	return execute_encap_tc_cmd(new_re, "add");
 }
 
-void remove_encap_rule (const sai_route_entry_t   *route_entry)
+void remove_encap_rule (const sai_route_entry_t *route_entry)
 {
 	sai_object_id_t     sai_route_index;
 
 	mlnx_find_route_entry(route_entry, &sai_route_index);
 	if (sai_route_index >= MAX_ROUTE_ENTRY_DB)
-		return SAI_STATUS_INVALID_PARAMETER;
+		return;
 
-	return execute_encap_tc_cmd(g_sai_db_ptr->route_entry_db[sai_route_index], "del");
+	execute_encap_tc_cmd(g_sai_db_ptr->route_entry_db[sai_route_index], "del");
 }
 
 static sai_status_t mlnx_route_etry_add(const sai_route_entry_t   *route_entry,

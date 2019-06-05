@@ -29,8 +29,6 @@
 
 #define SAI_ERR(status) ((status) != SAI_STATUS_SUCCESS)
 
-int modify_tc_flower_tunnel (struct tc_flower_tunnel_info *tun_info);
-
 typedef struct mlnx_vlan_member {
 	uint32_t               index; /* also sai vlan member id */
 	sai_object_id_t        sai_bridge_port_id;
