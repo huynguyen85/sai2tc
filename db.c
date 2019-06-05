@@ -4,9 +4,41 @@ extern sai_db_t  *g_sai_db_ptr;
 #define IP_STRING_SIZE 100
 #define TC_CMD_SIZE    1000
 
+#define P1_DEV     "ens1f0"
+#define P2_DEV     "ens1f1"
+#define VXLAN_DEV  "vxlan_sys_4789"
+
 char  buf_src[IP_STRING_SIZE];
 char  buf_dst[IP_STRING_SIZE];
 char  tc_cmd[TC_CMD_SIZE];
+
+static sai_status_t find_vlan_id_from_vr_id (sai_object_id_t sai_vr_id,
+					     uint16_t *vlan_id)
+{
+	mlnx_router_interface_t     *router_interface;
+	sai_object_id_t              sai_vlan_id;
+	uint32_t                     i;
+
+	/* Use vr_id to find vlan_id */
+	for (i = 0; i < MAX_ROUTER_INTERFACE_DB; i++) {
+		router_interface = g_sai_db_ptr->router_interface_db[i];
+		if (NULL == router_interface)
+			continue;
+		if (router_interface->sai_vr_id == sai_vr_id) {
+			sai_vlan_id = router_interface->sai_vlan_id;
+			*vlan_id = g_sai_db_ptr->vlans_db[sai_vlan_id]->vlan_id;
+			break;
+		}
+
+	}
+
+	if (MAX_ROUTER_INTERFACE_DB == i) {
+		MLNX_SAI_DBG("Cannot find matching vlan\n");
+		return SAI_STATUS_ITEM_NOT_FOUND;
+	}
+
+	return SAI_STATUS_SUCCESS;
+}
 	
 static sai_status_t mlnx_nh_add(
 		sai_object_id_t        *sai_nh_id,
@@ -938,21 +970,60 @@ sai_status_t mlnx_remove_port(_In_ sai_object_id_t port_id)
 	return SAI_STATUS_SUCCESS;
 }
 
-static sai_status_t mlnx_set_all_decap_rules(void)
+static sai_status_t execute_decap_tc_cmd(const char action[],
+					 uint32_t vni,
+					 uint16_t vlan_id)
 {
-	sai_object_id_t              sai_tm_decap_id;
-	mlnx_tunnel_map_t           *tm_decap;
-	mlnx_tunnel_t               *tunnel;
-	
-	tunnel = g_sai_db_ptr->tunnel;
-	if (NULL == tunnel)
-		return SAI_STATUS_SUCCESS;
+	sai_status_t		     status;
 
-	tm_decap = g_sai_db_ptr->tunnel_map_db[tunnel->sai_tm_decap_id];
- 	if (NULL == tm_decap)
-		return SAI_STATUS_ITEM_NOT_FOUND;
-	sai_tm_decap_id = tm_decap->index;
-	MLNX_SAI_DBG("mlnx_set_all_decap_rules sai_tm_decap_id=%d\n", tm_decap->index);
+	/* Build tc command */
+	memset(tc_cmd, 0, TC_CMD_SIZE);
+	memset(buf_dst, 0, IP_STRING_SIZE);
+
+	status = ip2string(buf_dst, &g_sai_db_ptr->term_table_entry->decap_dst_ip);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Fail to convert encap dst_ip\n");
+		return status;
+	}
+
+	sprintf(tc_cmd,
+		"tc filter add dev %s protocol 0x800 parent ffff: prio 2 flower ip_flags nofrag "
+		"enc_dst_ip %s enc_key_id %d enc_dst_port 4789 action tunnel_key unset action vlan push id %d "
+		"action mirred egress redirect dev %s",
+		VXLAN_DEV, buf_dst, vni, vlan_id, P1_DEV);
+
+	MLNX_SAI_LOG("%s\n", tc_cmd);
+	system(tc_cmd);
+
+	return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t mlnx_modify_all_decap_rules(const char action[])
+{
+	mlnx_tm_entry_t       *tm_entry;
+	uint32_t               ii;
+	uint32_t               vni;
+	sai_object_id_t        sai_vr_id;
+	uint16_t               vlan_id;
+	sai_status_t           status;
+
+	for (ii = 0; ii < MAX_TM_ENTRY_DB; ii++) {
+		tm_entry = g_sai_db_ptr->tm_entry_db[ii];
+		if (NULL == tm_entry)
+			continue;
+		if (tm_entry->type != SAI_TUNNEL_MAP_TYPE_VNI_TO_VIRTUAL_ROUTER_ID)
+			continue;
+		
+		vni = tm_entry->vni;
+		sai_vr_id = tm_entry->sai_vr_id;
+
+		status = find_vlan_id_from_vr_id(sai_vr_id, &vlan_id);
+		if (status)
+			return status;
+
+		MLNX_SAI_DBG("decap vni=%d, vlan_id=%d\n", vni, vlan_id);
+		status = execute_decap_tc_cmd(action, vni, vlan_id);
+	}	
 
 	return SAI_STATUS_SUCCESS;
 }
@@ -967,6 +1038,7 @@ sai_status_t mlnx_create_tunnel_term_table_entry(
 	const sai_attribute_value_t *attr_val;
 	uint32_t                     attr_idx;
 	sai_object_id_t              sai_tunnel_id;
+	sai_ip_address_t            *ipaddr;
 	
 	MLNX_SAI_DBG("mlnx_create_tunnel_term_table_entry\n");
 	if (NULL != g_sai_db_ptr->term_table_entry)
@@ -980,16 +1052,28 @@ sai_status_t mlnx_create_tunnel_term_table_entry(
 	MLNX_SAI_DBG("SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_ACTION_TUNNEL_ID=%lx\n", attr_val->oid);
 	sai_tunnel_id = attr_val->oid;
 
+	status = find_attrib_in_list(attr_count, attr_list, SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_DST_IP, &attr_val, &attr_idx);
+	if (SAI_ERR(status)) {
+		MLNX_SAI_ERR("Missing mandatory SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_DST_IP attr\n");
+		return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+	}
+	ipaddr = &attr_val->ipaddr;
+
+	/* Allocate term table entry */
 	g_sai_db_ptr->term_table_entry =
 		(mlnx_tunnel_term_table_entry_t *) calloc (1, sizeof(mlnx_tunnel_term_table_entry_t));
 
 	if (!g_sai_db_ptr->term_table_entry)
 		return SAI_STATUS_NO_MEMORY;
 
+	/* Configure term table entry */
 	*sai_tunnel_term_table_entry_id = DEFAULT_TERM_TABLE_ENTRY;
 	g_sai_db_ptr->term_table_entry->sai_tunnel_id = sai_tunnel_id;
+	memcpy(&g_sai_db_ptr->term_table_entry->decap_dst_ip,
+	       ipaddr, sizeof(sai_ip_address_t));
+	MLNX_SAI_DBG("decap_dst_ipv4=%x\n", g_sai_db_ptr->term_table_entry->decap_dst_ip.addr.ip4);
 
-	status = mlnx_set_all_decap_rules();
+	status = mlnx_modify_all_decap_rules("add");
 
 	return status;
 }
@@ -1003,8 +1087,9 @@ sai_status_t mlnx_remove_tunnel_term_table_entry(
 
 	free(g_sai_db_ptr->term_table_entry);
 	g_sai_db_ptr->term_table_entry = NULL;
+	mlnx_modify_all_decap_rules("del");
 
-		return SAI_STATUS_SUCCESS;
+	return SAI_STATUS_SUCCESS;
 }
 
 static void mlnx_find_route_entry(
@@ -1055,13 +1140,13 @@ static sai_status_t execute_encap_tc_cmd(mlnx_route_entry_t *new_re, const char 
 	}
 
 	sprintf(tc_cmd,
-		"tc filter %s dev ens1f1 protocol 802.1q parent ffff: prio 2 flower vlan_id %d action vlan pop "
+		"tc filter %s dev %s protocol 802.1q parent ffff: prio 2 flower vlan_id %d action vlan pop "
 		"action tunnel_key set src_ip %s dst_ip %s dst_port 4789 id %d "
-		"action mirred egress redirect dev vxlan_sys_4789",
-		action, new_re->vlan_id, buf_src, buf_dst, new_re->vni);
+		"action mirred egress redirect dev %s",
+		action, P2_DEV, new_re->vlan_id, buf_src, buf_dst, new_re->vni, VXLAN_DEV);
 
 	MLNX_SAI_LOG("%s\n", tc_cmd);
-	system(tc_cmd);
+	//system(tc_cmd);
 
 	return SAI_STATUS_SUCCESS;
 }
@@ -1074,13 +1159,12 @@ static sai_status_t add_encap_rule(mlnx_route_entry_t        *new_re,
 	mlnx_tunnel_t               *tunnel;
 	mlnx_tunnel_map_t           *tm_encap;
 	mlnx_tm_entry_t             *tm_entry;
-	mlnx_router_interface_t     *router_interface;
 	sai_object_id_t              sai_tm_encap_id;
-	sai_object_id_t              sai_vlan_id;
 	sai_object_id_t              sai_vr_id;
 	uint32_t                     vni;
 	uint16_t                     vlan_id;
 	int                          i;
+	sai_status_t                 status;
 
 	sai_vr_id = route_entry->vr_id;
 	if (sai_vr_id >= MAX_VRS_DB)
@@ -1120,23 +1204,10 @@ static sai_status_t add_encap_rule(mlnx_route_entry_t        *new_re,
 		MLNX_SAI_DBG("Cannot find matching tm entry\n");
 		return SAI_STATUS_ITEM_NOT_FOUND;
 	}
-	/* Use vr_id to find vlan_id */
-	for (i = 0; i < MAX_ROUTER_INTERFACE_DB; i++) {
-		router_interface = g_sai_db_ptr->router_interface_db[i];
-		if (NULL == router_interface)
-			continue;
-		if (router_interface->sai_vr_id == sai_vr_id) {
-			sai_vlan_id = router_interface->sai_vlan_id;
-			vlan_id = g_sai_db_ptr->vlans_db[sai_vlan_id]->vlan_id;
-			break;
-		}
 
-	}
-
-	if (MAX_ROUTER_INTERFACE_DB == i) {
-		MLNX_SAI_DBG("Cannot find matching vlan\n");
-		return SAI_STATUS_ITEM_NOT_FOUND;
-	}
+	status = find_vlan_id_from_vr_id(sai_vr_id, &vlan_id);
+	if (status)
+		return status;
 
 	/* Found matching item */
 	MLNX_SAI_DBG("tunnel_map vni=%d\n", vni);

@@ -90,6 +90,7 @@ typedef struct mlnx_nexthop_t {
 
 typedef struct mlnx_tunnel_term_table_entry_t {
 	sai_object_id_t        sai_tunnel_id;
+	sai_ip_address_t       decap_dst_ip;
 } mlnx_tunnel_term_table_entry_t;
 
 typedef struct mlnx_route_entry_t {
