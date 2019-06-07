@@ -367,7 +367,6 @@ int connect_to_switch() {
 
 	/* Clean up */
 	printf("Clean up\n");
-
 	for (i = 0; i < NUM_TEST_TM_ENTRY; i++) {
 		status = sai_tunnel_api->remove_tunnel_map_entry(sai_tm_entry_id[i]);
 		if (SAI_ERR(status))
